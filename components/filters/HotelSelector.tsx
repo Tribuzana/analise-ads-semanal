@@ -37,12 +37,14 @@ export function HotelSelector() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="w-full justify-between sm:w-[300px]">
-          <div className="flex items-center gap-2">
-            <Hotel className="h-4 w-4" />
-            <span>
+          <div className="flex items-center gap-2 min-w-0">
+            <Hotel className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">
               {selectedHotels.length === 0
                 ? 'Selecione os hotéis'
-                : `${selectedHotels.length} hotel(is) selecionado(s)`}
+                : selectedHotels.length === 1
+                ? hoteis.find(h => h.nome_hotel === selectedHotels[0])?.nome_fantasia || selectedHotels[0]
+                : `${selectedHotels.length} hotéis selecionados`}
             </span>
           </div>
           <ChevronDown className="ml-2 h-4 w-4 opacity-50" />

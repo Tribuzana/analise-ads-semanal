@@ -66,7 +66,7 @@ export function MetaAdsMetrics({ campaigns, comparisonCampaigns }: MetaAdsMetric
         title="Receita"
         value={formatCurrency(totalRevenue)}
         icon={<TrendingUp className="h-4 w-4" />}
-        subtitle={`ROAS: ${roas.toFixed(2)}`}
+        subtitle={`ROAS: ${roas.toFixed(1)}`}
         change={hasComparison ? calculateDelta(totalRevenue, previousRevenue) : undefined}
         compareValue={hasComparison ? formatCurrency(previousRevenue) : undefined}
       />
@@ -109,9 +109,9 @@ export function MetaAdsMetrics({ campaigns, comparisonCampaigns }: MetaAdsMetric
 
       <MetricCard
         title="ROAS"
-        value={roas.toFixed(2)}
+        value={roas.toFixed(1)}
         change={hasComparison ? calculateDelta(roas, previousRoas) : undefined}
-        compareValue={hasComparison ? previousRoas.toFixed(2) : undefined}
+        compareValue={hasComparison ? previousRoas.toFixed(1) : undefined}
       />
 
       <MetricCard

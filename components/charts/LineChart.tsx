@@ -7,7 +7,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts'
 import { formatCurrency } from '@/lib/utils/format'
@@ -64,7 +63,6 @@ export function LineChart({ data, dataKeys, xAxisKey = 'date', yAxisFormatter }:
             return value
           }}
         />
-        <Legend />
         {dataKeys.map(({ key, name, color }) => (
           <Line
             key={key}

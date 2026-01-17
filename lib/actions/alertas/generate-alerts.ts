@@ -1,9 +1,11 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getMatchingClients } from '@/lib/supabase/filter-helpers'
 import type { FilterState } from '@/types'
 import type { Alert } from '@/types/alertas'
 import { subDays, format, differenceInDays } from 'date-fns'
+import { getPreviousPeriodRange, getYearAgoRange } from '@/lib/utils/date-helpers'
 import { calculateROAS, calculateCPA, calculateCTR, calculateDelta } from '@/lib/utils/calculations'
 
 export async function generateAlerts(filters: FilterState): Promise<Alert[]> {
@@ -17,47 +19,25 @@ export async function generateAlerts(filters: FilterState): Promise<Alert[]> {
       return []
     }
 
-    // Buscar dados do período atual
+    // 1. Buscar IDs de conta correspondentes usando o helper centralizado
+    const matchingAccountIds = await getMatchingClients(supabase, filters)
+
+    // Se filtrou mas não achou nenhuma conta, retorna vazio
+    if (matchingAccountIds !== null && matchingAccountIds.length === 0) {
+      console.warn('[generateAlerts] Nenhum ID de conta correspondente encontrado')
+      return []
+    }
+
+    // 2. Buscar dados do período atual
     let currentQuery = supabase
       .from('metricas_ads')
       .select('*')
       .gte('date', filters.startDate)
       .lte('date', filters.endDate)
+      .limit(10000)
 
-    // Filtrar por hotéis se selecionados
-    if (filters.selectedHotels.length > 0) {
-      // Buscar clientes correspondentes
-      type ClientItem = {
-        client?: string
-      }
-      const { data: uniqueClients }: { data: ClientItem[] | null } = await supabase
-        .from('metricas_ads')
-        .select('client')
-        .gte('date', filters.startDate)
-        .lte('date', filters.endDate)
-      
-      const matchingClients = new Set<string>()
-      const clientSet = new Set(uniqueClients?.map(c => c.client).filter(Boolean) || [])
-      
-      filters.selectedHotels.forEach(hotelName => {
-        const normalized = hotelName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        clientSet.forEach(client => {
-          if (client) {
-            const normalizedClient = client.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            if (
-              normalizedClient === normalized ||
-              normalizedClient.includes(normalized) ||
-              normalized.includes(normalizedClient)
-            ) {
-              matchingClients.add(client)
-            }
-          }
-        })
-      })
-      
-      if (matchingClients.size > 0) {
-        currentQuery = currentQuery.in('client', Array.from(matchingClients))
-      }
+    if (matchingAccountIds !== null) {
+      currentQuery = currentQuery.in('account_id', matchingAccountIds)
     }
 
     const { data: currentData, error: currentError } = await currentQuery
@@ -67,48 +47,38 @@ export async function generateAlerts(filters: FilterState): Promise<Alert[]> {
       throw currentError
     }
 
-    // Buscar dados da semana anterior para comparação
-    const prevStart = format(subDays(new Date(filters.startDate), 7), 'yyyy-MM-dd')
-    const prevEnd = format(subDays(new Date(filters.endDate), 7), 'yyyy-MM-dd')
+    // 3. Buscar dados do período anterior para comparação
+    const previousRange = filters.compareYearAgo
+      ? getYearAgoRange(filters.startDate, filters.endDate)
+      : getPreviousPeriodRange(filters.startDate, filters.endDate)
+    
+    const prevMatchingAccountIds = await getMatchingClients(supabase, {
+      startDate: previousRange.startDate,
+      endDate: previousRange.endDate,
+      selectedHotels: filters.selectedHotels,
+      selectedCidades: filters.selectedCidades,
+      selectedEstados: filters.selectedEstados,
+    })
 
     let previousQuery = supabase
       .from('metricas_ads')
       .select('*')
-      .gte('date', prevStart)
-      .lte('date', prevEnd)
+      .gte('date', previousRange.startDate)
+      .lte('date', previousRange.endDate)
+      .limit(10000)
 
-    if (filters.selectedHotels.length > 0) {
-      const { data: prevClients } = await supabase
-        .from('metricas_ads')
-        .select('client')
-        .gte('date', prevStart)
-        .lte('date', prevEnd)
-      
-      const matchingClients = new Set<string>()
-      const clientSet = new Set(prevClients?.map(c => c.client).filter(Boolean) || [])
-      
-      filters.selectedHotels.forEach(hotelName => {
-        const normalized = hotelName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        clientSet.forEach(client => {
-          if (client) {
-            const normalizedClient = client.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            if (
-              normalizedClient === normalized ||
-              normalizedClient.includes(normalized) ||
-              normalized.includes(normalizedClient)
-            ) {
-              matchingClients.add(client)
-            }
-          }
-        })
-      })
-      
-      if (matchingClients.size > 0) {
-        previousQuery = previousQuery.in('client', Array.from(matchingClients))
+    if (prevMatchingAccountIds !== null) {
+      if (prevMatchingAccountIds.length > 0) {
+        previousQuery = previousQuery.in('account_id', prevMatchingAccountIds)
+      } else {
+        // Se filtrou mas não achou nada no período anterior, previousData será vazio
+        previousQuery = null as any
       }
     }
 
-    const { data: previousData, error: previousError } = await previousQuery
+    const { data: previousData, error: previousError } = previousQuery 
+      ? await previousQuery 
+      : { data: [], error: null }
 
     if (previousError) {
       console.error('[generateAlerts] Erro ao buscar dados anteriores:', previousError)
@@ -169,6 +139,10 @@ export async function generateAlerts(filters: FilterState): Promise<Alert[]> {
       if (impressionShareLostAlert) alerts.push(impressionShareLostAlert)
     }
 
+    // 11. Projeção de Saldo da Conta (7 dias)
+    const accountAlerts = checkAccountBalances(campaignMap)
+    alerts.push(...accountAlerts)
+
     console.log(`[generateAlerts] Gerados ${alerts.length} alertas`)
     return alerts
   } catch (error) {
@@ -182,11 +156,28 @@ function groupByCampaign(data: any[]): Map<string, any> {
 
   data.forEach(row => {
     const key = `${row.campaign_id}_${row.platform}`
+    
+    // Tenta resolver o nome do hotel de forma mais precisa
+    let resolvedClient = row.client
+    const accountName = row.account_name || ''
+    
+    if (accountName.toUpperCase().includes('DPNY')) {
+      resolvedClient = 'DPNY'
+    } else if (accountName.toUpperCase().includes('GRINBERGS') || accountName.toUpperCase().includes('GRÍNBERGS')) {
+      resolvedClient = 'Grínbergs'
+    } else if (resolvedClient === 'grinbergs') {
+      // Se o client é 'grinbergs' mas não tem no nome da conta, mantém grinbergs ou tenta capitalizar
+      resolvedClient = 'Grínbergs'
+    } else {
+      // Capitaliza a primeira letra para exibição
+      resolvedClient = resolvedClient.charAt(0).toUpperCase() + resolvedClient.slice(1)
+    }
+
     if (!map.has(key)) {
       map.set(key, {
         campaign_id: row.campaign_id,
         campaign_name: row.campaign_name,
-        client: row.client,
+        client: resolvedClient,
         platform: row.platform === 'Google' ? 'Google Ads' : row.platform === 'Meta' ? 'Meta Ads' : row.platform,
         campaign_status: row.campaign_status,
         campaign_end_date: row.campaign_end_date,
@@ -198,16 +189,33 @@ function groupByCampaign(data: any[]): Map<string, any> {
         daily_budget: row.min_daily_budget,
         search_budget_lost_impression_share: row.search_budget_lost_impression_share,
         dates: [],
+        latest_day_spend: 0,
+        latest_date: '',
+        // Dados da conta para projeção de saldo
+        account_id: row.account_id,
+        account_name: row.account_name,
+        account_spend_cap: row.account_level_spend_cap,
+        account_amount_spent: row.account_level_amount_spent,
       })
     }
 
     const campaign = map.get(key)
     campaign.spend += parseFloat(String(row.spend || 0))
-    campaign.revenue += parseFloat(String(row.conversions_value || 0))
-    campaign.conversions += parseInt(String(row.conversions || 0), 10)
+    // Coalesce para suportar tanto Google (conversions_value) quanto Meta (action_value_omni_purchase)
+    campaign.revenue += parseFloat(String(row.conversions_value || row.action_value_omni_purchase || 0))
+    campaign.conversions += parseInt(String(row.conversions || row.action_omni_purchase || row.action_leads || 0), 10)
     campaign.clicks += parseInt(String(row.clicks || 0), 10)
     campaign.impressions += parseInt(String(row.impressions || 0), 10)
     campaign.dates.push(row.date)
+    
+    if (!campaign.latest_date || row.date >= campaign.latest_date) {
+      if (row.date > campaign.latest_date) {
+        campaign.latest_day_spend = parseFloat(String(row.spend || 0))
+        campaign.latest_date = row.date
+      } else {
+        campaign.latest_day_spend += parseFloat(String(row.spend || 0))
+      }
+    }
   })
 
   return map
@@ -250,9 +258,12 @@ function checkLowPerformance(campaign: any, config?: any): Alert | null {
 function checkLowBudget(campaign: any): Alert | null {
   if (!campaign.daily_budget || campaign.daily_budget === 0) return null
 
-  const budgetUsage = (campaign.spend / campaign.daily_budget) * 100
+  // Usar o gasto do último dia para verificar orçamento diário
+  const budgetUsage = (campaign.latest_day_spend / campaign.daily_budget) * 100
+  const hour = new Date().getHours()
 
-  if (budgetUsage >= 80 && budgetUsage < 100) {
+  // Alerta se o gasto estiver alto proporcionalmente ao horário (ex: > 70% antes das 14h)
+  if (budgetUsage >= 70 && budgetUsage < 95 && hour < 14) {
     return {
       id: `low_budget_${campaign.campaign_id}_${campaign.platform}`,
       type: 'low_budget',
@@ -261,16 +272,16 @@ function checkLowBudget(campaign: any): Alert | null {
       campaign_name: campaign.campaign_name || 'Sem nome',
       client: campaign.client,
       platform: campaign.platform,
-      message: `Saldo baixo: ${budgetUsage.toFixed(0)}% do orçamento diário utilizado`,
+      message: `Gasto diário acelerado: ${budgetUsage.toFixed(0)}% do orçamento utilizado antes das 14h`,
       metrics: { 
-        spend: campaign.spend, 
+        latest_day_spend: campaign.latest_day_spend, 
         daily_budget: campaign.daily_budget,
         budgetUsage 
       },
       actions: [
-        'Aumentar orçamento diário',
-        'Revisar estratégia de lances',
-        'Monitorar performance próximas horas',
+        'Monitorar performance nas próximas horas',
+        'Avaliar aumento de orçamento se o ROAS estiver bom',
+        'Revisar lances para desacelerar o gasto',
       ],
       created_at: new Date().toISOString(),
       resolved: false,
@@ -349,8 +360,9 @@ function checkBudgetExhausted(campaign: any): Alert | null {
   if (!campaign.daily_budget || campaign.daily_budget === 0) return null
 
   const hour = new Date().getHours()
+  const budgetUsage = (campaign.latest_day_spend / campaign.daily_budget) * 100
   
-  if (campaign.spend >= campaign.daily_budget * 0.95 && hour < 18) {
+  if (budgetUsage >= 95 && hour < 18) {
     return {
       id: `budget_exhausted_${campaign.campaign_id}_${campaign.platform}`,
       type: 'budget_exhausted',
@@ -359,16 +371,16 @@ function checkBudgetExhausted(campaign: any): Alert | null {
       campaign_name: campaign.campaign_name || 'Sem nome',
       client: campaign.client,
       platform: campaign.platform,
-      message: `Orçamento diário esgotado antes das 18h`,
+      message: `Orçamento diário esgotado (${budgetUsage.toFixed(0)}%) antes das 18h`,
       metrics: { 
-        spend: campaign.spend,
+        latest_day_spend: campaign.latest_day_spend,
         daily_budget: campaign.daily_budget,
         hour 
       },
       actions: [
-        'Aumentar orçamento diário',
+        'Aumentar orçamento diário para não perder tráfego noturno',
         'Otimizar estratégia de lances',
-        'Distribuir budget ao longo do dia',
+        'Avaliar se o ROAS justifica o aumento',
       ],
       created_at: new Date().toISOString(),
       resolved: false,
@@ -533,6 +545,74 @@ function checkImpressionShareLost(campaign: any): Alert | null {
   }
 
   return null
+}
+
+function checkAccountBalances(campaignMap: Map<string, any>): Alert[] {
+  const accountMap = new Map<string, any>()
+  const alerts: Alert[] = []
+
+  // Agrupar métricas por conta
+  campaignMap.forEach(campaign => {
+    const accountId = campaign.account_id
+    if (!accountId) return
+
+    if (!accountMap.has(accountId)) {
+      accountMap.set(accountId, {
+        account_id: accountId,
+        account_name: campaign.account_name,
+        client: campaign.client,
+        platform: campaign.platform,
+        spend_cap: parseFloat(String(campaign.account_spend_cap || 0)),
+        amount_spent: parseFloat(String(campaign.account_amount_spent || 0)),
+        total_period_spend: 0,
+        days_in_period: new Set(campaign.dates).size,
+      })
+    }
+
+    const account = accountMap.get(accountId)
+    account.total_period_spend += campaign.spend
+  })
+
+  accountMap.forEach(account => {
+    if (account.spend_cap <= 0) return
+
+    const balanceCents = account.spend_cap - account.amount_spent
+    const balance = balanceCents / 100
+    
+    // Média de gasto diário no período
+    const avgDailySpend = account.total_period_spend / (account.days_in_period || 1)
+    
+    if (avgDailySpend > 0) {
+      const daysRemaining = balance / avgDailySpend
+
+      if (daysRemaining <= 7) {
+        alerts.push({
+          id: `account_balance_${account.account_id}`,
+          type: 'low_budget', // Reutilizando tipo existente ou poderia ser 'balance_projection'
+          severity: daysRemaining <= 3 ? 'critical' : 'warning',
+          campaign_id: 'account',
+          campaign_name: `Conta: ${account.account_name}`,
+          client: account.client,
+          platform: account.platform,
+          message: `Saldo projetado para acabar em ${Math.ceil(daysRemaining)} dias (Saldo: R$ ${balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`,
+          metrics: { 
+            balance, 
+            avg_daily_spend: avgDailySpend,
+            days_remaining: daysRemaining 
+          },
+          actions: [
+            'Adicionar saldo à conta',
+            'Reduzir lances para prolongar duração',
+            'Priorizar campanhas de alta performance',
+          ],
+          created_at: new Date().toISOString(),
+          resolved: false,
+        })
+      }
+    }
+  })
+
+  return alerts
 }
 
 async function getAlertConfigs(hotels: string[]): Promise<any[]> {

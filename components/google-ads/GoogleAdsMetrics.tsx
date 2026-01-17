@@ -64,7 +64,7 @@ export function GoogleAdsMetrics({ campaigns, comparisonCampaigns }: GoogleAdsMe
         title="Receita"
         value={formatCurrency(totalRevenue)}
         icon={<TrendingUp className="h-4 w-4" />}
-        subtitle={`ROAS: ${roas.toFixed(2)}`}
+        subtitle={`ROAS: ${roas.toFixed(1)}`}
         change={hasComparison ? calculateDelta(totalRevenue, previousRevenue) : undefined}
         compareValue={hasComparison ? formatCurrency(previousRevenue) : undefined}
       />

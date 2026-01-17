@@ -11,7 +11,6 @@ import {
   Globe, 
   Facebook,
   Bell,
-  Settings,
   ChevronLeft,
   ChevronRight,
   Calendar
@@ -29,9 +28,8 @@ const navigation = [
   { name: 'Marketing Analytics', href: '/marketing-analytics', icon: TrendingUp },
   { name: 'Google Ads', href: '/google-ads', icon: Globe },
   { name: 'Meta Ads', href: '/meta-ads', icon: Facebook },
-  { name: 'Reservas', href: '/reservas', icon: Calendar },
+  { name: 'Buscas', href: '/reservas', icon: Calendar },
   { name: 'Alertas', href: '/alertas', icon: Bell },
-  { name: 'Configurações', href: '/configuracoes', icon: Settings },
 ]
 
 export function Sidebar() {
@@ -68,29 +66,20 @@ export function Sidebar() {
     >
       <div className="flex h-full flex-col">
         {/* Header com logo */}
-        <div className="flex h-16 items-center justify-between border-b px-4">
-          {collapsed ? (
-            <div className="flex items-center justify-center w-full">
-              <Image
-                src="/logo-tribuzana.png"
-                alt="Tribuzana"
-                width={32}
-                height={32}
-                className="object-contain"
-              />
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Image
-                src="/logo-tribuzana.png"
-                alt="Tribuzana"
-                width={32}
-                height={32}
-                className="object-contain"
-              />
-              <h1 className="text-xl font-bold text-primary">Tribuzana</h1>
-            </div>
-          )}
+        <div className="flex h-16 items-center justify-center px-4">
+          <div className="relative w-full h-full flex items-center justify-center">
+            <Image
+              src="/logo-tribuzana.png"
+              alt="Tribuzana"
+              width={collapsed ? 40 : 200}
+              height={48}
+              className={cn(
+                "object-contain w-auto h-auto",
+                collapsed ? "max-h-10 max-w-10" : "max-h-12 max-w-[180px]"
+              )}
+              priority
+            />
+          </div>
         </div>
 
         {/* Navegação */}

@@ -36,56 +36,35 @@ export async function getReservasAnalytics(filters: FilterState): Promise<Reserv
       }
     }
 
-    // Buscar hotéis que correspondem aos filtros
-    let hotelIds: number[] = []
-    if (filters.selectedHotels.length > 0 || filters.selectedCidades.length > 0 || filters.selectedEstados.length > 0) {
-      const hotelQuery = supabase
-        .from('hoteis_config')
-        .select('id, motor_id')
-        .eq('ativo', true)
-      
-      if (filters.selectedHotels.length > 0) {
-        hotelQuery.in('nome_hotel', filters.selectedHotels)
-      }
-      if (filters.selectedCidades.length > 0) {
-        hotelQuery.in('cidade', filters.selectedCidades)
-      }
-      if (filters.selectedEstados.length > 0) {
-        hotelQuery.in('estado', filters.selectedEstados)
-      }
-      
-      const { data: hoteisFiltrados } = await hotelQuery
-      hotelIds = hoteisFiltrados?.map(h => h.id) || []
+    // 1. Buscar hotéis que correspondem aos filtros
+    const hotelQuery = supabase
+      .from('hoteis_config')
+      .select('motor_id, motor_reserva')
+      .eq('ativo', true)
+    
+    if (filters.selectedHotels.length > 0) {
+      hotelQuery.in('nome_hotel', filters.selectedHotels)
+    }
+    if (filters.selectedCidades.length > 0) {
+      hotelQuery.in('cidade', filters.selectedCidades)
+    }
+    if (filters.selectedEstados.length > 0) {
+      hotelQuery.in('estado', filters.selectedEstados)
+    }
+    
+    const { data: hoteisData, error: hotelError } = await hotelQuery
+    
+    if (hotelError) {
+      console.error('[getReservasAnalytics] Erro ao buscar hotéis:', hotelError)
+      throw hotelError
     }
 
-    // Query base
-    let query = supabase
-      .from('coletas_reservas')
-      .select('*')
-      .gte('data_coleta', filters.startDate)
-      .lte('data_coleta', filters.endDate)
+    const motores = hoteisData?.map(h => ({ 
+      motor_id: h.motor_id, 
+      motor_reserva: h.motor_reserva 
+    })).filter(h => h.motor_id && h.motor_reserva) || []
 
-    // Filtrar por motor_id se houver hotéis selecionados
-    if (hotelIds.length > 0) {
-      const { data: hoteisData } = await supabase
-        .from('hoteis_config')
-        .select('motor_id')
-        .in('id', hotelIds)
-      
-      const motorIds = hoteisData?.map(h => h.motor_id).filter(Boolean) || []
-      if (motorIds.length > 0) {
-        query = query.in('motor_id', motorIds)
-      }
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      console.error('[getReservasAnalytics] Erro:', error)
-      throw error
-    }
-
-    if (!data || data.length === 0) {
+    if (motores.length === 0) {
       return {
         totalBuscas: 0,
         porDia: [],
@@ -96,55 +75,50 @@ export async function getReservasAnalytics(filters: FilterState): Promise<Reserv
       }
     }
 
-    // Agregar por dia
-    const porDiaMap = new Map<string, number>()
-    data.forEach(row => {
-      const date = new Date(row.data_coleta).toISOString().split('T')[0]
-      porDiaMap.set(date, (porDiaMap.get(date) || 0) + 1)
-    })
-
-    const porDia = Array.from(porDiaMap.entries())
-      .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => a.date.localeCompare(b.date))
-
-    // Agregar por dispositivo
-    const porDispositivoMap = new Map<string, number>()
-    data.forEach(row => {
-      const dispositivo = row.dispositivo || 'Não informado'
-      porDispositivoMap.set(dispositivo, (porDispositivoMap.get(dispositivo) || 0) + 1)
-    })
-
-    const porDispositivo = Array.from(porDispositivoMap.entries())
-      .map(([dispositivo, count]) => ({ dispositivo, count }))
-      .sort((a, b) => b.count - a.count)
-
-    // Calcular médias
-    const antecedencias = data
-      .map(r => r.antecedencia_dias)
-      .filter((a): a is number => a !== null && a !== undefined)
+    // 2. Chamar RPCs para agregar dados no banco (evita limites de linhas e melhora performance)
+    // Garantir que a data final inclua todo o dia (para colunas de timestamp)
+    const endDateFull = filters.endDate.includes('T') ? filters.endDate : `${filters.endDate}T23:59:59`
     
-    const duracoes = data
-      .map(r => r.duracao_dias)
-      .filter((d): d is number => d !== null && d !== undefined)
+    const [kpisRes, chartRes, deviceRes] = await Promise.all([
+      supabase.rpc('get_dashboard_kpis', { 
+        p_motores: motores, 
+        p_date_from: filters.startDate, 
+        p_date_to: endDateFull
+      }),
+      supabase.rpc('get_dashboard_buscas_chart', { 
+        p_motores: motores, 
+        p_date_from: filters.startDate, 
+        p_date_to: endDateFull
+      }),
+      supabase.rpc('get_dashboard_distribuicao_dispositivo', { 
+        p_motores: motores, 
+        p_date_from: filters.startDate, 
+        p_date_to: endDateFull
+      })
+    ])
 
-    const antecedenciaMedia = antecedencias.length > 0
-      ? antecedencias.reduce((sum, val) => sum + val, 0) / antecedencias.length
-      : 0
+    if (kpisRes.error) console.error('[getReservasAnalytics] Erro RPC KPIs:', kpisRes.error)
+    if (chartRes.error) console.error('[getReservasAnalytics] Erro RPC Chart:', chartRes.error)
+    if (deviceRes.error) console.error('[getReservasAnalytics] Erro RPC Dispositivo:', deviceRes.error)
 
-    const duracaoMedia = duracoes.length > 0
-      ? duracoes.reduce((sum, val) => sum + val, 0) / duracoes.length
-      : 0
-
+    const kpiData = kpisRes.data?.[0] || { total_buscas: 0, antecedencia_media: 0, duracao_media: 0 }
+    
     return {
-      totalBuscas: data.length,
-      porDia,
-      porDispositivo,
-      porCidade: [], // Seria necessário buscar cidade do hotel
-      antecedenciaMedia: Math.round(antecedenciaMedia),
-      duracaoMedia: Math.round(duracaoMedia),
+      totalBuscas: Number(kpiData.total_buscas || 0),
+      porDia: (chartRes.data || []).map((d: any) => ({
+        date: d.data,
+        count: Number(d.buscas || 0)
+      })),
+      porDispositivo: (deviceRes.data || []).map((d: any) => ({
+        dispositivo: d.dispositivo,
+        count: Number(d.count || 0)
+      })),
+      porCidade: [], // Requer lógica adicional se necessário
+      antecedenciaMedia: Number(kpiData.antecedencia_media || 0),
+      duracaoMedia: Number(kpiData.duracao_media || 0),
     }
   } catch (error: any) {
-    console.error('[getReservasAnalytics] Erro:', error)
+    console.error('[getReservasAnalytics] Erro geral:', error)
     return {
       totalBuscas: 0,
       porDia: [],

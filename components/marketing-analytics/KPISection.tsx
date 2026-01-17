@@ -62,10 +62,10 @@ export function KPISection({ data }: KPISectionProps) {
 
       <MetricCard
         title="ROAS Médio"
-        value={averageROAS.toFixed(2)}
+        value={averageROAS.toFixed(1)}
         icon={<TrendingUp className="h-4 w-4" />}
         change={hasComparison ? calculateDelta(averageROAS, previousAverageROAS) : undefined}
-        compareValue={hasComparison ? previousAverageROAS.toFixed(2) : undefined}
+        compareValue={hasComparison ? previousAverageROAS.toFixed(1) : undefined}
       />
 
       <MetricCard

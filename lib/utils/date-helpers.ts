@@ -1,4 +1,12 @@
-import { subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, format, subYears } from 'date-fns'
+import { subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, format, subYears, differenceInDays } from 'date-fns'
+
+/**
+ * Converte string 'YYYY-MM-DD' para objeto Date de forma segura (ignorando timezone)
+ */
+const parseDate = (dateStr: string) => {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
 
 export const getDefaultDateRange = () => {
   const today = new Date()
@@ -65,8 +73,8 @@ export const getLastMonth = () => {
 }
 
 export const getYearAgoRange = (startDate: string, endDate: string) => {
-  const start = new Date(startDate)
-  const end = new Date(endDate)
+  const start = parseDate(startDate)
+  const end = parseDate(endDate)
   
   const yearAgoStart = subYears(start, 1)
   const yearAgoEnd = subYears(end, 1)
@@ -82,16 +90,15 @@ export const getYearAgoRange = (startDate: string, endDate: string) => {
  * Exemplo: Se o período é de 7 dias (01/01 a 07/01), retorna os 7 dias anteriores (25/12 a 31/12)
  */
 export const getPreviousPeriodRange = (startDate: string, endDate: string) => {
-  const start = new Date(startDate)
-  const end = new Date(endDate)
+  const start = parseDate(startDate)
+  const end = parseDate(endDate)
   
   // Calcular a duração do período em dias
-  const diffTime = end.getTime() - start.getTime()
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  const diffDays = differenceInDays(end, start) + 1
   
   // Calcular o período anterior subtraindo a duração do final
   const previousEnd = subDays(start, 1) // Um dia antes do início do período atual
-  const previousStart = subDays(previousEnd, diffDays) // Subtrair a duração
+  const previousStart = subDays(previousEnd, diffDays - 1) // Subtrair a duração
   
   return {
     startDate: format(previousStart, 'yyyy-MM-dd'),

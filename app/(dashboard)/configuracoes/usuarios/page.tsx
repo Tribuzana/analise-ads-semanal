@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Users, Plus, Edit, Trash2 } from 'lucide-react'
+import { Users, Edit } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 
@@ -21,18 +21,31 @@ export default function UsuariosConfigPage() {
   const { usuario, loading: authLoading } = useAuth()
   const router = useRouter()
   const supabase = createClient()
+  const canAccess = usuario?.nivel_acesso === 'admin' || usuario?.nivel_acesso === 'analista'
+  const canEdit = usuario?.nivel_acesso === 'admin'
   
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [loading, setLoading] = useState(true)
   const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [search, setSearch] = useState('')
+
+  const filteredUsuarios = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return usuarios
+    return usuarios.filter(u => {
+      const nome = (u.nome_completo || '').toLowerCase()
+      const email = (u.email || '').toLowerCase()
+      return nome.includes(q) || email.includes(q)
+    })
+  }, [usuarios, search])
 
   useEffect(() => {
-    if (!authLoading && usuario && usuario.nivel_acesso !== 'admin') {
-      toast.error('Acesso restrito a administradores')
+    if (!authLoading && usuario && !canAccess) {
+      toast.error('Acesso restrito a administradores e analistas')
       router.push('/')
     }
-  }, [usuario, authLoading, router])
+  }, [usuario, authLoading, router, canAccess])
 
   const fetchUsuarios = useCallback(async () => {
     try {
@@ -55,6 +68,10 @@ export default function UsuariosConfigPage() {
   }, [fetchUsuarios])
 
   const handleSave = async (usuarioData: UsuarioUpdate) => {
+    if (!canEdit) {
+      toast.error('Você não tem permissão para editar usuários')
+      return
+    }
     try {
       if (editingUsuario) {
         const { error } = await (supabase.from('usuarios') as any)
@@ -77,6 +94,10 @@ export default function UsuariosConfigPage() {
   }
 
   const handleToggleActive = async (id: string, ativo: boolean) => {
+    if (!canEdit) {
+      toast.error('Você não tem permissão para editar usuários')
+      return
+    }
     try {
       const { error } = await (supabase.from('usuarios') as any)
         .update({ ativo: !ativo })
@@ -98,23 +119,33 @@ export default function UsuariosConfigPage() {
     )
   }
 
-  if (usuario?.nivel_acesso !== 'admin') {
+  if (!canAccess) {
     return null
   }
 
   return (
     <div className="space-y-10 pb-8">
-      <div className="flex items-center gap-3">
-        <Users className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold">Gerenciamento de Usuários</h1>
-          <p className="text-muted-foreground">
-            Gerencie usuários e permissões do sistema
-          </p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3">
+          <Users className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">Gerenciamento de Usuários</h1>
+            <p className="text-muted-foreground">
+              {canEdit ? 'Gerencie usuários e permissões do sistema' : 'Visualize usuários e permissões do sistema'}
+            </p>
+          </div>
+        </div>
+
+        <div className="w-full md:w-[320px]">
+          <Input
+            placeholder="Filtrar por nome ou email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
       </div>
 
-      {showForm && editingUsuario && (
+      {canEdit && showForm && editingUsuario && (
         <div className="py-6">
           <UsuarioForm
             usuario={editingUsuario}
@@ -129,7 +160,7 @@ export default function UsuariosConfigPage() {
 
       <div className="py-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {usuarios.map((user) => (
+        {filteredUsuarios.map((user) => (
           <Card key={user.id}>
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -137,16 +168,18 @@ export default function UsuariosConfigPage() {
                   <CardTitle>{user.nome_completo}</CardTitle>
                   <CardDescription>{user.email}</CardDescription>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    setEditingUsuario(user)
-                    setShowForm(true)
-                  }}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setEditingUsuario(user)
+                      setShowForm(true)
+                    }}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -158,6 +191,7 @@ export default function UsuariosConfigPage() {
                 <span className="text-sm font-medium">Ativo</span>
                 <Switch
                   checked={user.ativo}
+                  disabled={!canEdit}
                   onCheckedChange={() => handleToggleActive(user.id, user.ativo)}
                 />
               </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useDashboard } from '@/hooks/useDashboard'
 import { useMarketingAnalytics } from '@/hooks/useMarketingAnalytics'
 import { useLast4Weeks } from '@/hooks/useLast4Weeks'
@@ -17,6 +17,7 @@ import { PieChart } from '@/components/charts/PieChart'
 import { BarChart } from '@/components/charts/BarChart'
 import { InsightsPanel } from '@/components/dashboard/InsightsPanel'
 import { groupDataByWeek } from '@/lib/utils/dashboard-helpers'
+import type { CampaignData } from '@/types/marketing'
 import {
   TrendingUp,
   DollarSign,
@@ -83,7 +84,44 @@ export default function DashboardPage() {
   const { data: analyticsData } = useMarketingAnalytics()
   const { temporalData: last4WeeksData, campaignKPIs, loading: loading4Weeks } = useLast4Weeks()
   const { compareYearAgo } = useFilterContext()
-  const [weeklyView, setWeeklyView] = useState(false)
+  const [weeklyView, setWeeklyView] = useState(true)
+
+  const compareLabel = compareYearAgo ? 'vs ano anterior' : 'vs período anterior'
+
+  // Calcula os KPIs de status das campanhas para o período selecionado
+  const campaignKPIsFromPeriod = useMemo(() => {
+    if (!analyticsData?.campaigns) return null
+
+    const countStatus = (campaigns: CampaignData[]) => {
+      let active = 0
+      let paused = 0
+      campaigns.forEach(c => {
+        const status = c.campaign_status?.toUpperCase() || ''
+        if (status === 'ACTIVE' || status === 'ENABLED' || status === '') active++
+        else if (status === 'PAUSED' || status === 'PAUSE') paused++
+      })
+      return { active, paused }
+    }
+
+    const google = analyticsData.campaigns.filter(c => 
+      c.platform.toLowerCase().includes('google')
+    )
+    const meta = analyticsData.campaigns.filter(c => 
+      c.platform.toLowerCase().includes('meta') || c.platform.toLowerCase().includes('facebook')
+    )
+
+    const googleStatus = countStatus(google)
+    const metaStatus = countStatus(meta)
+
+    return {
+      activeGoogle: googleStatus.active,
+      pausedGoogle: googleStatus.paused,
+      activeMeta: metaStatus.active,
+      pausedMeta: metaStatus.paused,
+    }
+  }, [analyticsData?.campaigns])
+
+  const kpisToShow = campaignKPIsFromPeriod || campaignKPIs
 
   if (loading) {
     return (
@@ -139,22 +177,22 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             title="Campanhas Ativas Google"
-            value={formatNumber(campaignKPIs.activeGoogle)}
+            value={formatNumber(kpisToShow.activeGoogle)}
             icon={<PlayCircle className="h-4 w-4" />}
           />
           <MetricCard
             title="Campanhas Pausadas Google"
-            value={formatNumber(campaignKPIs.pausedGoogle)}
+            value={formatNumber(kpisToShow.pausedGoogle)}
             icon={<PauseCircle className="h-4 w-4" />}
           />
           <MetricCard
             title="Campanhas Ativas Meta"
-            value={formatNumber(campaignKPIs.activeMeta)}
+            value={formatNumber(kpisToShow.activeMeta)}
             icon={<PlayCircle className="h-4 w-4" />}
           />
           <MetricCard
             title="Campanhas Pausadas Meta"
-            value={formatNumber(campaignKPIs.pausedMeta)}
+            value={formatNumber(kpisToShow.pausedMeta)}
             icon={<PauseCircle className="h-4 w-4" />}
           />
         </div>
@@ -193,6 +231,7 @@ export default function DashboardPage() {
                     dates={dates}
                     valueType="currency"
                     compareValue={compareValue}
+                    compareLabel={compareLabel}
                   />
                 )
               })()}
@@ -216,6 +255,7 @@ export default function DashboardPage() {
                     dates={dates}
                     valueType="currency"
                     compareValue={compareValue}
+                    compareLabel={compareLabel}
                   />
                 )
               })()}
@@ -239,6 +279,7 @@ export default function DashboardPage() {
                     dates={dates}
                     valueType="number"
                     compareValue={compareValue}
+                    compareLabel={compareLabel}
                   />
                 )
               })()}
@@ -250,18 +291,19 @@ export default function DashboardPage() {
                   ? { delta: metrics.comparison.geral.delta.roas, isPositive: metrics.comparison.geral.delta.roas >= 0 }
                   : calculateDelta(sparklineData)
                 const compareValue = compareYearAgo && metrics.comparison
-                  ? metrics.comparison.geral.previous.roas.toFixed(2)
+                  ? metrics.comparison.geral.previous.roas.toFixed(1)
                   : undefined
                 return (
                   <SparklineCard
                     label="ROAS"
-                    value={metrics.geral.roas.toFixed(2)}
+                    value={metrics.geral.roas.toFixed(1)}
                     delta={delta}
                     isPositive={isPositive}
                     data={sparklineData}
                     dates={dates}
                     valueType="decimal"
                     compareValue={compareValue}
+                    compareLabel={compareLabel}
                   />
                 )
               })()}
@@ -274,6 +316,7 @@ export default function DashboardPage() {
                 icon={<DollarSign className="h-4 w-4" />}
                 change={metrics.comparison ? metrics.comparison.geral.delta.investment : undefined}
                 compareValue={metrics.comparison ? formatCurrency(metrics.comparison.geral.previous.investment) : undefined}
+                compareLabel={compareLabel}
               />
               <MetricCard
                 title="Receita Total"
@@ -281,6 +324,7 @@ export default function DashboardPage() {
                 icon={<TrendingUp className="h-4 w-4" />}
                 change={metrics.comparison ? metrics.comparison.geral.delta.revenue : undefined}
                 compareValue={metrics.comparison ? formatCurrency(metrics.comparison.geral.previous.revenue) : undefined}
+                compareLabel={compareLabel}
               />
               <MetricCard
                 title="Conversões"
@@ -288,14 +332,16 @@ export default function DashboardPage() {
                 icon={<ShoppingCart className="h-4 w-4" />}
                 change={metrics.comparison ? metrics.comparison.geral.delta.conversions : undefined}
                 compareValue={metrics.comparison ? formatNumber(metrics.comparison.geral.previous.conversions) : undefined}
+                compareLabel={compareLabel}
               />
               <MetricCard
                 title="ROAS"
-                value={metrics.geral.roas.toFixed(2)}
+                value={metrics.geral.roas.toFixed(1)}
                 subtitle={metrics.comparison ? undefined : "Return on Ad Spend"}
                 icon={<TrendingUp className="h-4 w-4" />}
                 change={metrics.comparison ? metrics.comparison.geral.delta.roas : undefined}
-                compareValue={metrics.comparison ? metrics.comparison.geral.previous.roas.toFixed(2) : undefined}
+                compareValue={metrics.comparison ? metrics.comparison.geral.previous.roas.toFixed(1) : undefined}
+                compareLabel={compareLabel}
               />
             </>
           )}
@@ -452,6 +498,7 @@ export default function DashboardPage() {
             icon={<DollarSign className="h-4 w-4" />}
             change={metrics.comparison ? metrics.comparison.googleAds.delta.investment : undefined}
             compareValue={metrics.comparison ? formatCurrency(metrics.comparison.googleAds.previous.investment) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="Receita"
@@ -459,18 +506,21 @@ export default function DashboardPage() {
             icon={<TrendingUp className="h-4 w-4" />}
             change={metrics.comparison ? metrics.comparison.googleAds.delta.revenue : undefined}
             compareValue={metrics.comparison ? formatCurrency(metrics.comparison.googleAds.previous.revenue) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="ROAS"
             value={metrics.googleAds.roas.toFixed(2)}
             change={metrics.comparison ? metrics.comparison.googleAds.delta.roas : undefined}
             compareValue={metrics.comparison ? metrics.comparison.googleAds.previous.roas.toFixed(2) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="CPA"
             value={formatCurrency(metrics.googleAds.cpa)}
             change={metrics.comparison ? metrics.comparison.googleAds.delta.cpa : undefined}
             compareValue={metrics.comparison ? formatCurrency(metrics.comparison.googleAds.previous.cpa) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="Cliques"
@@ -478,6 +528,7 @@ export default function DashboardPage() {
             icon={<MousePointerClick className="h-4 w-4" />}
             change={metrics.comparison ? metrics.comparison.googleAds.delta.clicks : undefined}
             compareValue={metrics.comparison ? formatNumber(metrics.comparison.googleAds.previous.clicks) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="Impressões"
@@ -485,18 +536,21 @@ export default function DashboardPage() {
             icon={<Eye className="h-4 w-4" />}
             change={metrics.comparison ? metrics.comparison.googleAds.delta.impressions : undefined}
             compareValue={metrics.comparison ? formatNumber(metrics.comparison.googleAds.previous.impressions) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="CTR"
             value={formatPercentage(metrics.googleAds.ctr)}
             change={metrics.comparison ? metrics.comparison.googleAds.delta.ctr : undefined}
             compareValue={metrics.comparison ? formatPercentage(metrics.comparison.googleAds.previous.ctr) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="CPC"
             value={formatCurrency(metrics.googleAds.cpc)}
             change={metrics.comparison ? metrics.comparison.googleAds.delta.cpc : undefined}
             compareValue={metrics.comparison ? formatCurrency(metrics.comparison.googleAds.previous.cpc) : undefined}
+            compareLabel={compareLabel}
           />
         </div>
       </div>
@@ -511,6 +565,7 @@ export default function DashboardPage() {
             icon={<DollarSign className="h-4 w-4" />}
             change={metrics.comparison ? metrics.comparison.metaAds.delta.investment : undefined}
             compareValue={metrics.comparison ? formatCurrency(metrics.comparison.metaAds.previous.investment) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="Receita"
@@ -518,18 +573,21 @@ export default function DashboardPage() {
             icon={<TrendingUp className="h-4 w-4" />}
             change={metrics.comparison ? metrics.comparison.metaAds.delta.revenue : undefined}
             compareValue={metrics.comparison ? formatCurrency(metrics.comparison.metaAds.previous.revenue) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="ROAS"
             value={metrics.metaAds.roas.toFixed(2)}
             change={metrics.comparison ? metrics.comparison.metaAds.delta.roas : undefined}
             compareValue={metrics.comparison ? metrics.comparison.metaAds.previous.roas.toFixed(2) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="CPA"
             value={formatCurrency(metrics.metaAds.cpa)}
             change={metrics.comparison ? metrics.comparison.metaAds.delta.cpa : undefined}
             compareValue={metrics.comparison ? formatCurrency(metrics.comparison.metaAds.previous.cpa) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="Cliques"
@@ -537,6 +595,7 @@ export default function DashboardPage() {
             icon={<MousePointerClick className="h-4 w-4" />}
             change={metrics.comparison ? metrics.comparison.metaAds.delta.clicks : undefined}
             compareValue={metrics.comparison ? formatNumber(metrics.comparison.metaAds.previous.clicks) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="Impressões"
@@ -544,18 +603,21 @@ export default function DashboardPage() {
             icon={<Eye className="h-4 w-4" />}
             change={metrics.comparison ? metrics.comparison.metaAds.delta.impressions : undefined}
             compareValue={metrics.comparison ? formatNumber(metrics.comparison.metaAds.previous.impressions) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="CTR"
             value={formatPercentage(metrics.metaAds.ctr)}
             change={metrics.comparison ? metrics.comparison.metaAds.delta.ctr : undefined}
             compareValue={metrics.comparison ? formatPercentage(metrics.comparison.metaAds.previous.ctr) : undefined}
+            compareLabel={compareLabel}
           />
           <MetricCard
             title="CPC"
             value={formatCurrency(metrics.metaAds.cpc)}
             change={metrics.comparison ? metrics.comparison.metaAds.delta.cpc : undefined}
             compareValue={metrics.comparison ? formatCurrency(metrics.comparison.metaAds.previous.cpc) : undefined}
+            compareLabel={compareLabel}
           />
         </div>
       </div>

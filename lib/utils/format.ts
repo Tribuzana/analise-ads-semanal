@@ -6,12 +6,15 @@ export const formatCurrency = (value: number | null | undefined): string => {
   }).format(value)
 }
 
-export const formatNumber = (value: number | null | undefined): string => {
+export const formatNumber = (value: number | null | undefined, decimals: number = 0): string => {
   if (value === null || value === undefined) return '0'
-  return new Intl.NumberFormat('pt-BR').format(value)
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value)
 }
 
-export const formatPercentage = (value: number | null | undefined, decimals: number = 2): string => {
+export const formatPercentage = (value: number | null | undefined, decimals: number = 1): string => {
   if (value === null || value === undefined) return '0%'
   return `${value.toFixed(decimals)}%`
 }

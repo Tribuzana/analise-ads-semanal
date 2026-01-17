@@ -59,14 +59,14 @@ export function useDashboard() {
 
     fetchMetrics()
   }, [
-    filters.selectedHotels,
+    filters.selectedHotels.join(','),
     filters.startDate,
     filters.endDate,
-    filters.selectedCidades,
-    filters.selectedEstados,
+    filters.selectedCidades.join(','),
+    filters.selectedEstados.join(','),
     filters.compareYearAgo,
-    filters.selectedObjectives,
-    filters.selectedResultTypes,
+    filters.selectedObjectives.join(','),
+    filters.selectedResultTypes.join(','),
   ])
 
   return { metrics, loading, error }

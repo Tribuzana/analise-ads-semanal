@@ -5,7 +5,6 @@ import {
   Pie,
   Cell,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts'
 import { formatCurrency } from '@/lib/utils/format'
@@ -53,7 +52,6 @@ export function PieChart({ data, colors = DEFAULT_COLORS }: PieChartProps) {
           }}
           formatter={(value: any) => formatCurrency(value)}
         />
-        <Legend />
       </RechartsPieChart>
     </ResponsiveContainer>
   )

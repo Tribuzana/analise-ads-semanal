@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -21,18 +21,37 @@ export default function HoteisConfigPage() {
   const { usuario, loading: authLoading } = useAuth()
   const router = useRouter()
   const supabase = createClient()
+  const canAccess = usuario?.nivel_acesso === 'admin' || usuario?.nivel_acesso === 'analista'
   
   const [hoteis, setHoteis] = useState<Hotel[]>([])
   const [loading, setLoading] = useState(true)
   const [editingHotel, setEditingHotel] = useState<Hotel | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [search, setSearch] = useState('')
+
+  const filteredHoteis = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return hoteis
+    return hoteis.filter(h => {
+      const nome = (h.nome_hotel || '').toLowerCase()
+      const fantasia = (h.nome_fantasia || '').toLowerCase()
+      const cidade = (h.cidade || '').toLowerCase()
+      const estado = (h.estado || '').toLowerCase()
+      return (
+        nome.includes(q) ||
+        fantasia.includes(q) ||
+        cidade.includes(q) ||
+        estado.includes(q)
+      )
+    })
+  }, [hoteis, search])
 
   useEffect(() => {
-    if (!authLoading && usuario && usuario.nivel_acesso !== 'admin') {
-      toast.error('Acesso restrito a administradores')
+    if (!authLoading && usuario && !canAccess) {
+      toast.error('Acesso restrito a administradores e analistas')
       router.push('/')
     }
-  }, [usuario, authLoading, router])
+  }, [usuario, authLoading, router, canAccess])
 
   const fetchHoteis = useCallback(async () => {
     try {
@@ -103,7 +122,7 @@ export default function HoteisConfigPage() {
     )
   }
 
-  if (usuario?.nivel_acesso !== 'admin') {
+  if (!canAccess) {
     return null
   }
 
@@ -119,13 +138,22 @@ export default function HoteisConfigPage() {
             </p>
           </div>
         </div>
-        <Button onClick={() => {
-          setEditingHotel(null)
-          setShowForm(true)
-        }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Hotel
-        </Button>
+        <div className="flex w-full max-w-[520px] items-center gap-3 justify-end">
+          <div className="w-full max-w-[320px]">
+            <Input
+              placeholder="Filtrar hotéis por nome, cidade ou UF..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <Button onClick={() => {
+            setEditingHotel(null)
+            setShowForm(true)
+          }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Hotel
+          </Button>
+        </div>
       </div>
 
       {showForm && (
@@ -143,7 +171,7 @@ export default function HoteisConfigPage() {
 
       <div className="py-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {hoteis.map((hotel) => (
+        {filteredHoteis.map((hotel) => (
           <Card key={hotel.id}>
             <CardHeader>
               <div className="flex items-start justify-between">

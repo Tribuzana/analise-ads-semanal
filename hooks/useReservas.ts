@@ -46,12 +46,12 @@ export function useReservas() {
   }, [
     filters.startDate,
     filters.endDate,
-    filters.selectedHotels,
-    filters.selectedCidades,
-    filters.selectedEstados,
+    filters.selectedHotels.join(','),
+    filters.selectedCidades.join(','),
+    filters.selectedEstados.join(','),
     filters.compareYearAgo,
-    filters.selectedObjectives,
-    filters.selectedResultTypes,
+    filters.selectedObjectives.join(','),
+    filters.selectedResultTypes.join(','),
   ])
 
   return { data, loading, error }

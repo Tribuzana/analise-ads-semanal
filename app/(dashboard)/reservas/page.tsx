@@ -62,7 +62,7 @@ export default function ReservasPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.antecedenciaMedia} dias</div>
+            <div className="text-2xl font-bold">{formatNumber(data.antecedenciaMedia, 1)} dias</div>
           </CardContent>
         </Card>
 
@@ -72,7 +72,7 @@ export default function ReservasPage() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.duracaoMedia} dias</div>
+            <div className="text-2xl font-bold">{formatNumber(data.duracaoMedia, 1)} dias</div>
           </CardContent>
         </Card>
 
@@ -84,7 +84,7 @@ export default function ReservasPage() {
           <CardContent>
             <div className="text-2xl font-bold">
               {data.totalBuscas > 0 && data.porDia.length > 0
-                ? Math.round(data.totalBuscas / data.porDia.length)
+                ? formatNumber(data.totalBuscas / data.porDia.length, 0)
                 : 0}
             </div>
           </CardContent>

@@ -5,20 +5,21 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Settings, Building2, Users, Puzzle, Webhook } from 'lucide-react'
+import { Settings, Building2, Users, Webhook } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
 export default function ConfiguracoesPage() {
   const { usuario, loading } = useAuth()
   const router = useRouter()
+  const canAccess = usuario?.nivel_acesso === 'admin' || usuario?.nivel_acesso === 'analista'
 
   useEffect(() => {
-    if (!loading && usuario && usuario.nivel_acesso !== 'admin') {
-      toast.error('Acesso restrito a administradores')
+    if (!loading && usuario && !canAccess) {
+      toast.error('Acesso restrito a administradores e analistas')
       router.push('/')
     }
-  }, [usuario, loading, router])
+  }, [usuario, loading, router, canAccess])
 
   if (loading) {
     return (
@@ -28,13 +29,13 @@ export default function ConfiguracoesPage() {
     )
   }
 
-  if (usuario?.nivel_acesso !== 'admin') {
+  if (!canAccess) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <p className="text-lg font-medium text-red-600">Acesso restrito</p>
           <p className="text-sm text-muted-foreground">
-            Esta página é acessível apenas para administradores
+            Esta página é acessível apenas para administradores e analistas
           </p>
         </div>
       </div>
@@ -48,7 +49,7 @@ export default function ConfiguracoesPage() {
         <div>
           <h1 className="text-3xl font-bold">Configurações do Sistema</h1>
           <p className="text-muted-foreground">
-            Gerencie hotéis, usuários, módulos e integrações
+            Gerencie hotéis, usuários e integrações
           </p>
         </div>
       </div>
@@ -63,10 +64,6 @@ export default function ConfiguracoesPage() {
           <TabsTrigger value="usuarios">
             <Users className="mr-2 h-4 w-4" />
             Usuários
-          </TabsTrigger>
-          <TabsTrigger value="modulos">
-            <Puzzle className="mr-2 h-4 w-4" />
-            Módulos
           </TabsTrigger>
           <TabsTrigger value="webhooks">
             <Webhook className="mr-2 h-4 w-4" />
@@ -112,22 +109,6 @@ export default function ConfiguracoesPage() {
                   Ir para Gerenciamento de Usuários →
                 </button>
               </Link>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="modulos" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Módulos do Sistema</CardTitle>
-              <CardDescription>
-                Configure módulos e permissões de acesso
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Os módulos do sistema são gerenciados automaticamente. Entre em contato com o administrador para mais informações.
-              </p>
             </CardContent>
           </Card>
         </TabsContent>

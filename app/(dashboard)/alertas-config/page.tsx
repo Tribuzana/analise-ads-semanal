@@ -18,6 +18,7 @@ export default function AlertasConfigPage() {
   const { usuario } = useAuth()
   const { hoteis } = useHoteis()
   const router = useRouter()
+  const canAccess = usuario?.nivel_acesso === 'admin' || usuario?.nivel_acesso === 'analista'
 
   const [selectedHotel, setSelectedHotel] = useState<number | null>(null)
   const [config, setConfig] = useState<AlertConfig>({
@@ -35,11 +36,11 @@ export default function AlertasConfigPage() {
 
   // Verificar permissão de admin
   useEffect(() => {
-    if (usuario && usuario.nivel_acesso !== 'admin') {
-      toast.error('Acesso restrito a administradores')
+    if (usuario && !canAccess) {
+      toast.error('Acesso restrito a administradores e analistas')
       router.push('/')
     }
-  }, [usuario, router])
+  }, [usuario, router, canAccess])
 
   // Carregar configuração ao selecionar hotel
   useEffect(() => {
@@ -122,13 +123,13 @@ export default function AlertasConfigPage() {
     setConfig({ ...config, webhookSecret: secret })
   }
 
-  if (usuario?.nivel_acesso !== 'admin') {
+  if (!canAccess) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <p className="text-lg font-medium text-red-600">Acesso restrito</p>
           <p className="text-sm text-muted-foreground">
-            Esta página é acessível apenas para administradores
+            Esta página é acessível apenas para administradores e analistas
           </p>
         </div>
       </div>

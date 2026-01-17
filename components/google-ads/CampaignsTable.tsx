@@ -5,6 +5,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -42,6 +43,34 @@ export function CampaignsTable({ campaigns, onCampaignClick }: CampaignsTablePro
       setSortDirection('desc')
     }
   }
+
+  const totals = useMemo(() => {
+    if (campaigns.length === 0) return null
+
+    const t = campaigns.reduce(
+      (acc, c) => ({
+        spend: acc.spend + (c.spend || 0),
+        revenue: acc.revenue + (c.revenue || 0),
+        conversions: acc.conversions + (c.conversions || 0),
+        clicks: acc.clicks + (c.clicks || 0),
+        impressions: acc.impressions + (c.impressions || 0),
+      }),
+      { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 }
+    )
+
+    const roas = t.spend > 0 ? t.revenue / t.spend : 0
+    const cpa = t.conversions > 0 ? t.spend / t.conversions : 0
+    const ctr = t.impressions > 0 ? (t.clicks / t.impressions) * 100 : 0
+    const cpc = t.clicks > 0 ? t.spend / t.clicks : 0
+
+    return {
+      ...t,
+      roas,
+      cpa,
+      ctr,
+      cpc
+    }
+  }, [campaigns])
 
   const sortedCampaigns = useMemo(() => {
     if (!sortField) {
@@ -160,17 +189,17 @@ export function CampaignsTable({ campaigns, onCampaignClick }: CampaignsTablePro
       <Table>
         <TableHeader>
           <TableRow>
-            <SortableHeaderLeft field="campaign_name">Campanha</SortableHeaderLeft>
-            <TableHead>Status</TableHead>
-            <SortableHeaderLeft field="campaign_objective">Objetivo</SortableHeaderLeft>
-            <SortableHeader field="spend" className="text-right">Investimento</SortableHeader>
-            <SortableHeader field="revenue" className="text-right">Receita</SortableHeader>
-            <SortableHeader field="roas" className="text-right">ROAS</SortableHeader>
-            <SortableHeader field="conversions" className="text-right">Conversões</SortableHeader>
-            <SortableHeader field="cpa" className="text-right">CPA</SortableHeader>
-            <SortableHeader field="clicks" className="text-right">Cliques</SortableHeader>
-            <SortableHeader field="ctr" className="text-right">CTR</SortableHeader>
-            <SortableHeader field="cpc" className="text-right">CPC</SortableHeader>
+            <SortableHeaderLeft field="campaign_name" className="px-2">Campanha</SortableHeaderLeft>
+            <TableHead className="px-2">Status</TableHead>
+            <SortableHeaderLeft field="campaign_objective" className="px-2">Objetivo</SortableHeaderLeft>
+            <SortableHeader field="spend" className="text-right px-2">Invest.</SortableHeader>
+            <SortableHeader field="revenue" className="text-right px-2">Receita</SortableHeader>
+            <SortableHeader field="roas" className="text-right px-2">ROAS</SortableHeader>
+            <SortableHeader field="conversions" className="text-right px-2">Conv.</SortableHeader>
+            <SortableHeader field="cpa" className="text-right px-2">CPA</SortableHeader>
+            <SortableHeader field="clicks" className="text-right px-2">Cliques</SortableHeader>
+            <SortableHeader field="ctr" className="text-right px-2">CTR</SortableHeader>
+            <SortableHeader field="cpc" className="text-right px-2">CPC</SortableHeader>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -185,31 +214,46 @@ export function CampaignsTable({ campaigns, onCampaignClick }: CampaignsTablePro
               <TableRow 
                 key={campaign.campaign_id}
                 onClick={() => onCampaignClick?.(campaign)}
-                className={onCampaignClick ? "cursor-pointer" : ""}
+                className={cn(onCampaignClick ? "cursor-pointer" : "", "text-[13px]")}
               >
-                <TableCell className="font-medium max-w-[300px] truncate" title={campaign.campaign_name || ''}>
+                <TableCell className="font-medium max-w-[150px] truncate px-2" title={campaign.campaign_name || ''}>
                   {campaign.campaign_name || 'Sem nome'}
                 </TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className={getStatusColor(campaign.campaign_status)}>
+                <TableCell className="px-2">
+                  <Badge variant="secondary" className={cn(getStatusColor(campaign.campaign_status), "text-[10px] px-1 py-0 h-5")}>
                     {campaign.campaign_status || 'N/A'}
                   </Badge>
                 </TableCell>
-                <TableCell className="max-w-[200px] truncate" title={campaign.campaign_objective || ''}>
+                <TableCell className="max-w-[120px] truncate px-2" title={campaign.campaign_objective || ''}>
                   {campaign.campaign_objective || 'N/A'}
                 </TableCell>
-                <TableCell className="text-right">{formatCurrency(campaign.spend)}</TableCell>
-                <TableCell className="text-right">{formatCurrency(campaign.revenue)}</TableCell>
-                <TableCell className="text-right font-bold">{campaign.roas.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{formatNumber(campaign.conversions)}</TableCell>
-                <TableCell className="text-right">{formatCurrency(campaign.cpa)}</TableCell>
-                <TableCell className="text-right">{formatNumber(campaign.clicks)}</TableCell>
-                <TableCell className="text-right">{formatPercentage(campaign.ctr)}</TableCell>
-                <TableCell className="text-right">{formatCurrency(campaign.cpc)}</TableCell>
+                <TableCell className="text-right px-2">{formatCurrency(campaign.spend)}</TableCell>
+                <TableCell className="text-right px-2">{formatCurrency(campaign.revenue)}</TableCell>
+                <TableCell className="text-right font-bold px-2">{campaign.roas.toFixed(2)}</TableCell>
+                <TableCell className="text-right px-2">{formatNumber(campaign.conversions)}</TableCell>
+                <TableCell className="text-right px-2">{formatCurrency(campaign.cpa)}</TableCell>
+                <TableCell className="text-right px-2">{formatNumber(campaign.clicks)}</TableCell>
+                <TableCell className="text-right px-2">{formatPercentage(campaign.ctr)}</TableCell>
+                <TableCell className="text-right px-2">{formatCurrency(campaign.cpc)}</TableCell>
               </TableRow>
             ))
           )}
         </TableBody>
+        {totals && (
+          <TableFooter>
+            <TableRow className="hover:bg-transparent font-bold bg-muted/50 text-[13px]">
+              <TableCell colSpan={3} className="px-2">Resumo Total</TableCell>
+              <TableCell className="text-right px-2">{formatCurrency(totals.spend)}</TableCell>
+              <TableCell className="text-right px-2">{formatCurrency(totals.revenue)}</TableCell>
+              <TableCell className="text-right px-2">{totals.roas.toFixed(2)}</TableCell>
+              <TableCell className="text-right px-2">{formatNumber(totals.conversions)}</TableCell>
+              <TableCell className="text-right px-2">{formatCurrency(totals.cpa)}</TableCell>
+              <TableCell className="text-right px-2">{formatNumber(totals.clicks)}</TableCell>
+              <TableCell className="text-right px-2">{formatPercentage(totals.ctr)}</TableCell>
+              <TableCell className="text-right px-2">{formatCurrency(totals.cpc)}</TableCell>
+            </TableRow>
+          </TableFooter>
+        )}
       </Table>
     </div>
   )

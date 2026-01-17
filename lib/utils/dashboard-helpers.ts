@@ -18,7 +18,8 @@ export function processLast4WeeksTemporalData(data: any[]): Array<{ date: string
 
     const day = dateMap.get(row.date)
     day.spend += parseFloat(String(row.spend || 0))
-    day.revenue += parseFloat(String(row.conversions_value || 0))
+    // Coalesce para suportar tanto Google (conversions_value) quanto Meta (action_value_omni_purchase)
+    day.revenue += parseFloat(String(row.conversions_value || row.action_value_omni_purchase || 0))
   })
 
   return Array.from(dateMap.values())

@@ -5,6 +5,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -162,6 +163,55 @@ export function CampaignsComparisonTable({
     }
   }
 
+  const totals = useMemo(() => {
+    if (filteredCampaigns.length === 0) return null
+
+    const currentTotal = filteredCampaigns.reduce(
+      (acc, campaign) => ({
+        spend: acc.spend + campaign.spend,
+        revenue: acc.revenue + campaign.revenue,
+        conversions: acc.conversions + campaign.conversions,
+      }),
+      { spend: 0, revenue: 0, conversions: 0 }
+    )
+
+    const cpa = currentTotal.conversions > 0 ? currentTotal.spend / currentTotal.conversions : 0
+    const roas = currentTotal.spend > 0 ? currentTotal.revenue / currentTotal.spend : 0
+
+    const previousTotal = filteredCampaigns.reduce(
+      (acc, campaign) => {
+        const key = `${campaign.campaign_id}_${campaign.platform}`
+        const previous = previousCampaignsMap.get(key)
+        if (previous) {
+          return {
+            spend: acc.spend + previous.spend,
+            revenue: acc.revenue + previous.revenue,
+            conversions: acc.conversions + previous.conversions,
+          }
+        }
+        return acc
+      },
+      { spend: 0, revenue: 0, conversions: 0 }
+    )
+
+    const prevCpa = previousTotal.conversions > 0 ? previousTotal.spend / previousTotal.conversions : 0
+    const prevRoas = previousTotal.spend > 0 ? previousTotal.revenue / previousTotal.spend : 0
+
+    const variation = calculateCampaignVariations(
+      { ...currentTotal, cpa, roas } as CampaignData,
+      { ...previousTotal, cpa: prevCpa, roas: prevRoas } as CampaignData
+    )
+
+    return {
+      spend: currentTotal.spend,
+      revenue: currentTotal.revenue,
+      conversions: currentTotal.conversions,
+      cpa,
+      roas,
+      variation
+    }
+  }, [filteredCampaigns, previousCampaignsMap])
+
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) {
       return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
@@ -220,13 +270,13 @@ export function CampaignsComparisonTable({
       : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
 
     return (
-      <Badge variant="secondary" className={cn('gap-1', colorClass)}>
+      <Badge variant="secondary" className={cn('gap-1 px-1 py-0 h-5', colorClass)}>
         {isPositive ? (
           <ArrowUp className="h-3 w-3" />
         ) : (
           <ArrowDown className="h-3 w-3" />
         )}
-        <span className="text-xs">{Math.abs(value).toFixed(1)}%</span>
+        <span className="text-[10px] leading-none">{Math.abs(value).toFixed(1)}%</span>
       </Badge>
     )
   }
@@ -249,22 +299,22 @@ export function CampaignsComparisonTable({
       </div>
 
       {/* Tabela */}
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <SortableHeaderLeft field="campaign_name">Campanha</SortableHeaderLeft>
-              <SortableHeaderLeft field="campaign_objective">Objetivo</SortableHeaderLeft>
-              <TableHead className="text-right">Investimento</TableHead>
-              <TableHead className="text-right">% Inv.</TableHead>
-              <SortableHeader field="conversions" className="text-right">Resultados</SortableHeader>
-              <TableHead className="text-right">% Ações</TableHead>
-              <SortableHeader field="cpa" className="text-right">CPA</SortableHeader>
-              <TableHead className="text-right">% CPA</TableHead>
-              <SortableHeader field="revenue" className="text-right">Receita</SortableHeader>
-              <TableHead className="text-right">% Receita</TableHead>
-              <SortableHeader field="roas" className="text-right">ROAS</SortableHeader>
-              <TableHead className="text-right">% ROAS</TableHead>
+              <SortableHeaderLeft field="campaign_name" className="px-2">Campanha</SortableHeaderLeft>
+              <SortableHeaderLeft field="campaign_objective" className="px-2">Objetivo</SortableHeaderLeft>
+              <TableHead className="text-right px-2">Invest.</TableHead>
+              <TableHead className="text-right px-2">% Inv.</TableHead>
+              <SortableHeader field="conversions" className="text-right px-2">Result.</SortableHeader>
+              <TableHead className="text-right px-2">% Ações</TableHead>
+              <SortableHeader field="cpa" className="text-right px-2">CPA</SortableHeader>
+              <TableHead className="text-right px-2">% CPA</TableHead>
+              <SortableHeader field="revenue" className="text-right px-2">Receita</SortableHeader>
+              <TableHead className="text-right px-2">% Rec.</TableHead>
+              <SortableHeader field="roas" className="text-right px-2">ROAS</SortableHeader>
+              <TableHead className="text-right px-2">% ROAS</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -279,38 +329,65 @@ export function CampaignsComparisonTable({
                 <TableRow 
                   key={`${campaign.campaign_id}_${campaign.platform}`}
                   onClick={() => onCampaignClick?.(campaign)}
-                  className={onCampaignClick ? "cursor-pointer" : ""}
+                  className={cn(onCampaignClick ? "cursor-pointer" : "", "text-[13px]")}
                 >
-                  <TableCell className="font-medium max-w-[300px] truncate" title={campaign.campaign_name || ''}>
+                  <TableCell className="font-medium max-w-[150px] truncate px-2" title={campaign.campaign_name || ''}>
                     {campaign.campaign_name || 'Sem nome'}
                   </TableCell>
-                  <TableCell className="max-w-[200px] truncate" title={campaign.campaign_objective || ''}>
+                  <TableCell className="max-w-[100px] truncate px-2" title={campaign.campaign_objective || ''}>
                     {campaign.campaign_objective || 'N/A'}
                   </TableCell>
-                  <TableCell className="text-right">{formatCurrency(campaign.spend)}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right px-2">{formatCurrency(campaign.spend)}</TableCell>
+                  <TableCell className="text-right px-2">
                     {campaign.variation && <VariationBadge value={campaign.variation.spend} />}
                   </TableCell>
-                  <TableCell className="text-right">{formatNumber(campaign.conversions)}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right px-2">{formatNumber(campaign.conversions)}</TableCell>
+                  <TableCell className="text-right px-2">
                     {campaign.variation && <VariationBadge value={campaign.variation.conversions} />}
                   </TableCell>
-                  <TableCell className="text-right">{formatCurrency(campaign.cpa)}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right px-2">{formatCurrency(campaign.cpa)}</TableCell>
+                  <TableCell className="text-right px-2">
                     {campaign.variation && <VariationBadge value={campaign.variation.cpa} />}
                   </TableCell>
-                  <TableCell className="text-right">{formatCurrency(campaign.revenue)}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right px-2">{formatCurrency(campaign.revenue)}</TableCell>
+                  <TableCell className="text-right px-2">
                     {campaign.variation && <VariationBadge value={campaign.variation.revenue} />}
                   </TableCell>
-                  <TableCell className="text-right font-bold">{campaign.roas.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right px-2 font-bold">{campaign.roas.toFixed(2)}</TableCell>
+                  <TableCell className="text-right px-2">
                     {campaign.variation && <VariationBadge value={campaign.variation.roas} />}
                   </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
+          {totals && (
+            <TableFooter>
+              <TableRow className="hover:bg-transparent font-bold bg-muted/50 text-[13px]">
+                <TableCell colSpan={2} className="px-2">Resumo Total</TableCell>
+                <TableCell className="text-right px-2">{formatCurrency(totals.spend)}</TableCell>
+                <TableCell className="text-right px-2">
+                  <VariationBadge value={totals.variation.spend} />
+                </TableCell>
+                <TableCell className="text-right px-2">{formatNumber(totals.conversions)}</TableCell>
+                <TableCell className="text-right px-2">
+                  <VariationBadge value={totals.variation.conversions} />
+                </TableCell>
+                <TableCell className="text-right px-2">{formatCurrency(totals.cpa)}</TableCell>
+                <TableCell className="text-right px-2">
+                  <VariationBadge value={totals.variation.cpa} />
+                </TableCell>
+                <TableCell className="text-right px-2">{formatCurrency(totals.revenue)}</TableCell>
+                <TableCell className="text-right px-2">
+                  <VariationBadge value={totals.variation.revenue} />
+                </TableCell>
+                <TableCell className="text-right px-2">{totals.roas.toFixed(2)}</TableCell>
+                <TableCell className="text-right px-2">
+                  <VariationBadge value={totals.variation.roas} />
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          )}
         </Table>
       </div>
     </div>

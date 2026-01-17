@@ -16,6 +16,7 @@ interface SparklineCardProps {
   valueType?: 'currency' | 'number' | 'decimal' // Tipo de formatação para o tooltip
   dates?: string[]          // Array opcional de datas correspondentes aos dados
   compareValue?: string | number // Valor do período anterior (YoY)
+  compareLabel?: string    // Label para o valor de comparação (ex: "vs ano anterior")
 }
 
 /**
@@ -68,7 +69,7 @@ function generateSparklinePath(data: number[], width: number, height: number): s
   return path
 }
 
-export function SparklineCard({ label, value, delta, isPositive, data, valueType = 'number', dates, compareValue }: SparklineCardProps) {
+export function SparklineCard({ label, value, delta, isPositive, data, valueType = 'number', dates, compareValue, compareLabel }: SparklineCardProps) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; value: number; index: number; date?: string } | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -150,10 +151,10 @@ export function SparklineCard({ label, value, delta, isPositive, data, valueType
           {/* Métrica Principal */}
           <div className="text-2xl font-bold">{formattedValue}</div>
           
-          {/* Valor de comparação YoY */}
+          {/* Valor de comparação */}
           {compareValue !== undefined && (
             <p className="text-xs text-muted-foreground">
-              vs ano anterior: {compareValue}
+              {compareLabel || 'vs período anterior'}: {compareValue}
             </p>
           )}
           

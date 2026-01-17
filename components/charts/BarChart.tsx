@@ -7,7 +7,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts'
 
@@ -55,7 +54,6 @@ export function BarChart({ data, dataKeys, xAxisKey, yAxisFormatter }: BarChartP
             return value
           }}
         />
-        <Legend />
         {dataKeys.map(({ key, name, color }) => (
           <Bar key={key} dataKey={key} name={name} fill={color} />
         ))}

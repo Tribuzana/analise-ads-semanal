@@ -45,14 +45,14 @@ export function useAlertas() {
 
     fetchAlerts()
   }, [
-    filters.selectedHotels,
+    filters.selectedHotels.join(','),
     filters.startDate,
     filters.endDate,
-    filters.selectedCidades,
-    filters.selectedEstados,
+    filters.selectedCidades.join(','),
+    filters.selectedEstados.join(','),
     filters.compareYearAgo,
-    filters.selectedObjectives,
-    filters.selectedResultTypes,
+    filters.selectedObjectives.join(','),
+    filters.selectedResultTypes.join(','),
   ])
 
   const stats: AlertStats = {
