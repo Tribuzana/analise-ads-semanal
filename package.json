@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "node scripts/netlify-postbuild.mjs",
     "start": "next start",
     "lint": "next lint",
     "test": "echo \"No tests specified\" && exit 0"

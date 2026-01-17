@@ -3,7 +3,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { getMatchingClients, normalizePlatforms } from '@/lib/supabase/filter-helpers'
 import type { FilterState } from '@/types'
+import type { Database } from '@/types/database'
 import type { MarketingAnalyticsData, CampaignData, ObjectiveAnalysis, TemporalData, CampaignPeriodMetrics } from '@/types/marketing'
+
+type MetricaAds = Database['public']['Tables']['metricas_ads']['Row']
 import { calculateROAS, calculateCPA, calculateCPC, calculateCTR } from '@/lib/utils/calculations'
 import { mapHotelToClient } from '@/lib/utils/hotel-mapping'
 import { getPreviousPeriodRange, getYearAgoRange } from '@/lib/utils/date-helpers'
@@ -335,7 +338,7 @@ async function fetchAnalyticsForPeriod(
 
   let filteredData = data || []
   if (options?.selectedResultTypes && options.selectedResultTypes.length > 0) {
-    filteredData = filteredData.filter(row => {
+    filteredData = filteredData.filter((row: MetricaAds) => {
       return options.selectedResultTypes!.some(resultType => {
         switch (resultType) {
           case 'Conversões':
