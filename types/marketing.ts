@@ -75,7 +75,7 @@ export interface MarketingAnalyticsData {
   comparison?: MarketingAnalyticsComparison
 }
 
-export type SortField = 'campaign_name' | 'campaign_objective' | 'spend' | 'revenue' | 'roas' | 'conversions' | 'cpa' | 'clicks' | 'ctr' | 'cpc'
+export type SortField = 'campaign_name' | 'campaign_objective' | 'spend' | 'revenue' | 'roas' | 'conversions' | 'cpa' | 'clicks' | 'ctr' | 'cpc' | 'client' | 'platform'
 export type SortDirection = 'asc' | 'desc'
 export type CampaignStatusFilter = 'all' | 'active' | 'paused'
 

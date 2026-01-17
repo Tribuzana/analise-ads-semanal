@@ -305,7 +305,7 @@ export function CampaignsComparisonTable({
             <TableRow>
               <SortableHeaderLeft field="campaign_name" className="px-2">Campanha</SortableHeaderLeft>
               <SortableHeaderLeft field="campaign_objective" className="px-2">Objetivo</SortableHeaderLeft>
-              <TableHead className="text-right px-2">Invest.</TableHead>
+              <SortableHeader field="spend" className="text-right px-2">Invest.</SortableHeader>
               <TableHead className="text-right px-2">% Inv.</TableHead>
               <SortableHeader field="conversions" className="text-right px-2">Result.</SortableHeader>
               <TableHead className="text-right px-2">% Ações</TableHead>

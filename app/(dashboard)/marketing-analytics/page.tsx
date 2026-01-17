@@ -1,15 +1,54 @@
 'use client'
 
+import { useState } from 'react'
 import { useMarketingAnalytics } from '@/hooks/useMarketingAnalytics'
+import { useFilterContext } from '@/contexts/FilterContext'
 import { KPISection } from '@/components/marketing-analytics/KPISection'
 import { TopCampaignsTable } from '@/components/marketing-analytics/TopCampaignsTable'
 import { CampaignsComparisonTable } from '@/components/campaigns/CampaignsComparisonTable'
 import { ObjectiveAnalysisChart } from '@/components/marketing-analytics/ObjectiveAnalysisChart'
 import { PlatformComparison } from '@/components/marketing-analytics/PlatformComparison'
+import { CampaignDetailsModal } from '@/components/campaigns/CampaignDetailsModal'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getCampaignPeriodMetrics } from '@/lib/actions/marketing-analytics/get-analytics'
+import type { CampaignData, CampaignPeriodMetrics } from '@/types/marketing'
 
 export default function MarketingAnalyticsPage() {
   const { data, loading, error } = useMarketingAnalytics()
+  const filters = useFilterContext()
+  const [selectedCampaign, setSelectedCampaign] = useState<CampaignData | null>(null)
+  const [periodMetrics, setPeriodMetrics] = useState<CampaignPeriodMetrics | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [loadingMetrics, setLoadingMetrics] = useState(false)
+
+  const handleCampaignClick = async (campaign: CampaignData) => {
+    setSelectedCampaign(campaign)
+    setModalOpen(true)
+    setLoadingMetrics(true)
+
+    try {
+      const metrics = await getCampaignPeriodMetrics(
+        campaign.campaign_id,
+        campaign.platform,
+        {
+          selectedHotels: filters.selectedHotels,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          selectedCidades: filters.selectedCidades,
+          selectedEstados: filters.selectedEstados,
+          compareYearAgo: filters.compareYearAgo,
+          selectedObjectives: filters.selectedObjectives,
+          selectedResultTypes: filters.selectedResultTypes,
+        }
+      )
+      setPeriodMetrics(metrics)
+    } catch (err) {
+      console.error('Erro ao buscar métricas do período:', err)
+      setPeriodMetrics(null)
+    } finally {
+      setLoadingMetrics(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -80,7 +119,10 @@ export default function MarketingAnalyticsPage() {
       {/* Top Campanhas */}
       <div className="py-6">
         <h2 className="text-xl font-semibold mb-6">Top Campanhas</h2>
-        <TopCampaignsTable campaigns={data.topCampaigns} />
+        <TopCampaignsTable 
+          campaigns={data.topCampaigns} 
+          onCampaignClick={handleCampaignClick}
+        />
       </div>
 
       {/* Tabela de Campanhas com Variação */}
@@ -88,8 +130,17 @@ export default function MarketingAnalyticsPage() {
         <CampaignsComparisonTable
           campaigns={data.campaigns}
           previousCampaigns={data.comparison?.campaigns || []}
+          onCampaignClick={handleCampaignClick}
         />
       </div>
+
+      {/* Modal de Detalhes */}
+      <CampaignDetailsModal
+        campaign={selectedCampaign}
+        periodMetrics={periodMetrics}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+      />
     </div>
   )
 }
