@@ -27,7 +27,10 @@ export async function generateAlerts(filters: FilterState): Promise<Alert[]> {
     // Filtrar por hotéis se selecionados
     if (filters.selectedHotels.length > 0) {
       // Buscar clientes correspondentes
-      const { data: uniqueClients } = await supabase
+      type ClientItem = {
+        client?: string
+      }
+      const { data: uniqueClients }: { data: ClientItem[] | null } = await supabase
         .from('metricas_ads')
         .select('client')
         .gte('date', filters.startDate)
