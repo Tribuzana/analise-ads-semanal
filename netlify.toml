@@ -1,0 +1,17 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
+
+# Fallback: garantir que rotas do Next (App Router) sejam roteadas
+# para o handler do Netlify Functions quando não houver arquivo estático.
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/___netlify-server-handler"
+  status = 200

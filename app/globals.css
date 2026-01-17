@@ -1,0 +1,264 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 184 100% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 264 62% 76%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 14 100% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 184 100% 39%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 184 100% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 264 62% 76%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 14 100% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 184 100% 39%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Estilos personalizados para o calendário */
+@layer components {
+  .rdp {
+    --rdp-cell-size: 40px;
+    --rdp-accent-color: hsl(var(--primary));
+    --rdp-background-color: hsl(var(--accent));
+    --rdp-accent-color-dark: hsl(var(--primary));
+    --rdp-background-color-dark: hsl(var(--accent));
+    --rdp-outline: 2px solid hsl(var(--ring));
+    --rdp-outline-selected: 2px solid hsl(var(--primary));
+    color: hsl(var(--foreground));
+  }
+
+  /* Garantir alinhamento perfeito dos cabeçalhos com as células */
+  .rdp-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .rdp-head_row {
+    display: flex;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    gap: 8px;
+    justify-content: space-between;
+  }
+
+  .rdp-head_cell {
+    flex: 0 0 auto;
+    width: calc((100% - 36px) / 7);
+    text-align: center;
+    padding: 0.75rem 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: hsl(var(--muted-foreground));
+    box-sizing: border-box;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .rdp-row {
+    display: flex;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    gap: 8px;
+    justify-content: space-between;
+  }
+
+  .rdp-cell {
+    flex: 0 0 auto;
+    width: calc((100% - 48px) / 7);
+    position: relative;
+    box-sizing: border-box;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .rdp-day {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    margin: 0 auto;
+    color: hsl(var(--foreground));
+    border-radius: 8px;
+    transition: all 0.15s ease;
+    font-weight: 500;
+    position: relative;
+  }
+
+  .rdp-day:hover:not(.rdp-day_disabled):not(.rdp-day_selected):not(.rdp-day_range_middle) {
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+
+  /* Dias selecionados - quadrados individuais destacados */
+  .rdp-day_selected,
+  .rdp-day_range_start,
+  .rdp-day_range_end {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    font-weight: 600;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Dias no meio do range - também como quadrados individuais */
+  .rdp-day_range_middle {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    font-weight: 600;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Remover estilo de range contínuo */
+  .rdp-cell:has([aria-selected]) {
+    background-color: transparent !important;
+  }
+
+  .rdp-cell:has([aria-selected].day-range-end) {
+    background-color: transparent !important;
+  }
+
+  .rdp-cell:has([aria-selected].day-outside) {
+    background-color: transparent !important;
+  }
+
+  .rdp-cell:has([aria-selected]) {
+    border-radius: 0 !important;
+  }
+
+  /* Dia de hoje - destaque diferente */
+  .rdp-day_today:not(.rdp-day_selected):not(.rdp-day_range_middle):not(.rdp-day_range_start):not(.rdp-day_range_end) {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    font-weight: 600;
+    border: 1px solid hsl(var(--border));
+  }
+
+  .rdp-day_today.rdp-day_selected,
+  .rdp-day_today.rdp-day_range_middle,
+  .rdp-day_today.rdp-day_range_start,
+  .rdp-day_today.rdp-day_range_end {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    border: none !important;
+  }
+
+  .rdp-day_outside {
+    color: hsl(var(--muted-foreground));
+    opacity: 0.5;
+  }
+
+  .rdp-day_disabled {
+    color: hsl(var(--muted-foreground));
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .rdp-day_disabled:hover {
+    background-color: transparent !important;
+  }
+
+  .rdp-nav_button {
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
+  }
+
+  .rdp-nav_button:hover {
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+
+  .rdp-caption_label {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+  }
+
+  /* Espaçamento entre células */
+  .rdp-head_cell {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* Estilos para indicadores de comparação YoY */
+  .comparison-positive {
+    color: hsl(142, 71%, 45%);
+  }
+
+  .comparison-negative {
+    color: hsl(0, 84%, 60%);
+  }
+
+  .comparison-neutral {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .comparison-badge-positive {
+    background-color: hsl(142, 71%, 95%);
+    color: hsl(142, 71%, 25%);
+    border-color: hsl(142, 71%, 85%);
+  }
+
+  .comparison-badge-negative {
+    background-color: hsl(0, 84%, 95%);
+    color: hsl(0, 84%, 25%);
+    border-color: hsl(0, 84%, 85%);
+  }
+
+  .comparison-badge-neutral {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    border-color: hsl(var(--border));
+  }
+}
