@@ -91,5 +91,21 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['metricas_ads']['Row']>
       }
     }
+    Functions: {
+      get_balance_alerts: {
+        Args: {
+          p_user_id: string | null
+          p_user_role: string | null
+        }
+        Returns: any[]
+      }
+      get_google_ads_budget_alerts: {
+        Args: {
+          p_user_id: string | null
+          p_user_role: string | null
+        }
+        Returns: any[]
+      }
+    }
   }
 }
