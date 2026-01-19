@@ -9,6 +9,8 @@ import { CampaignsComparisonTable } from '@/components/campaigns/CampaignsCompar
 import { ObjectiveAnalysisChart } from '@/components/marketing-analytics/ObjectiveAnalysisChart'
 import { PlatformComparison } from '@/components/marketing-analytics/PlatformComparison'
 import { CampaignDetailsModal } from '@/components/campaigns/CampaignDetailsModal'
+import { BalanceAlertCard } from '@/components/alertas/BalanceAlertCard'
+import { GoogleAdsAlertCard } from '@/components/alertas/GoogleAdsAlertCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getCampaignPeriodMetrics } from '@/lib/actions/marketing-analytics/get-analytics'
 import type { CampaignData, CampaignPeriodMetrics } from '@/types/marketing'
@@ -101,6 +103,12 @@ export default function MarketingAnalyticsPage() {
         <p className="text-muted-foreground">
           Análise consolidada de todas as plataformas de anúncios
         </p>
+      </div>
+
+      {/* Alertas de Saldo */}
+      <div id="insights-automaticos" className="grid gap-6 md:grid-cols-2">
+        <BalanceAlertCard />
+        <GoogleAdsAlertCard />
       </div>
 
       {/* KPIs */}
