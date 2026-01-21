@@ -4,10 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import { getMatchingClients, normalizePlatforms } from '@/lib/supabase/filter-helpers'
 import type { FilterState } from '@/types'
 import type { Database } from '@/types/database'
-import type { MarketingAnalyticsData, CampaignData, ObjectiveAnalysis, TemporalData, CampaignPeriodMetrics } from '@/types/marketing'
+import type { MarketingAnalyticsData, CampaignData, ObjectiveAnalysis, BiddingStrategyAnalysis, TemporalData, CampaignPeriodMetrics } from '@/types/marketing'
 
 type MetricaAds = Database['public']['Tables']['metricas_ads']['Row']
-import { calculateROAS, calculateCPA, calculateCPC, calculateCTR } from '@/lib/utils/calculations'
+import { calculateROAS, calculateCPA, calculateCPC, calculateCTR, calculateCPM, calculateFrequency } from '@/lib/utils/calculations'
 import { mapHotelToClient } from '@/lib/utils/hotel-mapping'
 import { getPreviousPeriodRange, getYearAgoRange } from '@/lib/utils/date-helpers'
 
@@ -28,13 +28,14 @@ export async function getMarketingAnalytics(
       return {
         campaigns: [],
         objectiveAnalysis: [],
+        biddingStrategyAnalysis: [],
         temporalData: [],
         topCampaigns: [],
       }
     }
 
     // 1. Buscar IDs de conta correspondentes usando o helper centralizado
-    const matchingAccountIds = await getMatchingClients(supabase, filters)
+    const { accountIds: matchingAccountIds } = await getMatchingClients(supabase, filters)
 
     // Se filtrou mas não achou nenhuma conta, retorna vazio
     if (matchingAccountIds !== null && matchingAccountIds.length === 0) {
@@ -42,6 +43,7 @@ export async function getMarketingAnalytics(
       return {
         campaigns: [],
         objectiveAnalysis: [],
+        biddingStrategyAnalysis: [],
         temporalData: [],
         topCampaigns: [],
       }
@@ -117,6 +119,7 @@ export async function getMarketingAnalytics(
     // Processar dados
     const campaigns = processCampaigns(filteredData)
     const objectiveAnalysis = analyzeByObjective(filteredData)
+    const biddingStrategyAnalysis = analyzeByBiddingStrategy(filteredData)
     const temporalData = analyzeTemporalData(filteredData)
     const topCampaigns = campaigns
       .sort((a, b) => b.roas - a.roas)
@@ -125,6 +128,7 @@ export async function getMarketingAnalytics(
     const result: MarketingAnalyticsData = {
       campaigns,
       objectiveAnalysis,
+      biddingStrategyAnalysis,
       temporalData,
       topCampaigns,
     }
@@ -153,6 +157,7 @@ export async function getMarketingAnalytics(
 
     const previousCampaigns = processCampaigns(previousData || [])
     const previousObjectiveAnalysis = analyzeByObjective(previousData || [])
+    const previousBiddingStrategyAnalysis = analyzeByBiddingStrategy(previousData || [])
     const previousTemporalData = analyzeTemporalData(previousData || [])
     const previousTopCampaigns = previousCampaigns
       .sort((a, b) => b.roas - a.roas)
@@ -161,6 +166,7 @@ export async function getMarketingAnalytics(
     result.comparison = {
       campaigns: previousCampaigns,
       objectiveAnalysis: previousObjectiveAnalysis,
+      biddingStrategyAnalysis: previousBiddingStrategyAnalysis,
       temporalData: previousTemporalData,
       topCampaigns: previousTopCampaigns,
     }
@@ -173,6 +179,7 @@ export async function getMarketingAnalytics(
     return {
       campaigns: [],
       objectiveAnalysis: [],
+      biddingStrategyAnalysis: [],
       temporalData: [],
       topCampaigns: [],
     }
@@ -192,12 +199,15 @@ function processCampaigns(data: any[]): CampaignData[] {
         client: row.client,
         platform: row.platform === 'Google' ? 'Google Ads' : row.platform === 'Meta' ? 'Meta Ads' : row.platform,
         campaign_objective: row.campaign_objective,
+        campaign_bidding_strategy_type: row.campaign_bidding_strategy_type,
+        advertising_channel_type: row.advertising_channel_type,
         campaign_status: row.campaign_status,
         spend: 0,
         revenue: 0,
         conversions: 0,
         clicks: 0,
         impressions: 0,
+        estimated_reach: 0,
       })
     }
 
@@ -208,6 +218,7 @@ function processCampaigns(data: any[]): CampaignData[] {
     campaign.conversions += parseInt(String(row.conversions || row.action_omni_purchase || row.action_leads || 0), 10)
     campaign.clicks += parseInt(String(row.clicks || 0), 10)
     campaign.impressions += parseInt(String(row.impressions || 0), 10)
+    campaign.estimated_reach += parseInt(String(row.estimated_reach || 0), 10)
   })
 
   // Calcular métricas
@@ -217,6 +228,8 @@ function processCampaigns(data: any[]): CampaignData[] {
     cpa: calculateCPA(c.spend, c.conversions),
     cpc: calculateCPC(c.spend, c.clicks),
     ctr: calculateCTR(c.clicks, c.impressions),
+    cpm: calculateCPM(c.spend, c.impressions),
+    frequency: calculateFrequency(c.impressions, c.estimated_reach),
   }))
 }
 
@@ -250,6 +263,38 @@ function analyzeByObjective(data: any[]): ObjectiveAnalysis[] {
     revenue: obj.revenue,
     conversions: obj.conversions,
     roas: calculateROAS(obj.revenue, obj.spend),
+  }))
+}
+
+function analyzeByBiddingStrategy(data: any[]): BiddingStrategyAnalysis[] {
+  const strategyMap = new Map<string, any>()
+
+  data.forEach(row => {
+    const strategy = row.campaign_bidding_strategy_type || 'Não definido'
+    if (!strategyMap.has(strategy)) {
+      strategyMap.set(strategy, {
+        biddingStrategy: strategy,
+        campaigns: new Set(),
+        spend: 0,
+        revenue: 0,
+        conversions: 0,
+      })
+    }
+
+    const strat = strategyMap.get(strategy)
+    strat.campaigns.add(row.campaign_id)
+    strat.spend += parseFloat(String(row.spend || 0))
+    strat.revenue += parseFloat(String(row.conversions_value || row.action_value_omni_purchase || 0))
+    strat.conversions += parseInt(String(row.conversions || row.action_omni_purchase || row.action_leads || 0), 10)
+  })
+
+  return Array.from(strategyMap.values()).map(strat => ({
+    biddingStrategy: strat.biddingStrategy,
+    campaigns: strat.campaigns.size,
+    spend: strat.spend,
+    revenue: strat.revenue,
+    conversions: strat.conversions,
+    roas: calculateROAS(strat.revenue, strat.spend),
   }))
 }
 
@@ -296,7 +341,7 @@ async function fetchAnalyticsForPeriod(
     selectedResultTypes?: string[]
   }
 ): Promise<any[]> {
-  const matchingAccountIds = await getMatchingClients(supabase, {
+  const { accountIds: matchingAccountIds } = await getMatchingClients(supabase, {
     startDate,
     endDate,
     selectedHotels,
@@ -383,6 +428,9 @@ export async function getCampaignPeriodMetrics(
         cpa: 0,
         cpc: 0,
         ctr: 0,
+        cpm: 0,
+        frequency: 0,
+        estimated_reach: 0,
       }
     }
 
@@ -400,7 +448,7 @@ export async function getCampaignPeriodMetrics(
       .limit(10000)
 
     // Buscar IDs de conta correspondentes usando o helper centralizado
-    const matchingAccountIds = await getMatchingClients(supabase, filters)
+    const { accountIds: matchingAccountIds } = await getMatchingClients(supabase, filters)
 
     if (matchingAccountIds !== null) {
       if (matchingAccountIds.length === 0) {
@@ -414,6 +462,9 @@ export async function getCampaignPeriodMetrics(
           cpa: 0,
           cpc: 0,
           ctr: 0,
+          cpm: 0,
+          frequency: 0,
+          estimated_reach: 0,
         }
       }
       query = query.in('account_id', matchingAccountIds)
@@ -433,6 +484,7 @@ export async function getCampaignPeriodMetrics(
       conversions: 0,
       clicks: 0,
       impressions: 0,
+      estimated_reach: 0,
     }
 
     data?.forEach(row => {
@@ -442,6 +494,7 @@ export async function getCampaignPeriodMetrics(
       metrics.conversions += parseInt(String(row.conversions || row.action_omni_purchase || row.action_leads || 0), 10)
       metrics.clicks += parseInt(String(row.clicks || 0), 10)
       metrics.impressions += parseInt(String(row.impressions || 0), 10)
+      metrics.estimated_reach += parseInt(String(row.estimated_reach || 0), 10)
     })
 
     // Calcular métricas derivadas
@@ -451,6 +504,8 @@ export async function getCampaignPeriodMetrics(
       cpa: calculateCPA(metrics.spend, metrics.conversions),
       cpc: calculateCPC(metrics.spend, metrics.clicks),
       ctr: calculateCTR(metrics.clicks, metrics.impressions),
+      cpm: calculateCPM(metrics.spend, metrics.impressions),
+      frequency: calculateFrequency(metrics.impressions, metrics.estimated_reach),
     }
   } catch (error) {
     console.error('[getCampaignPeriodMetrics] Erro ao buscar métricas:', error)
@@ -464,6 +519,9 @@ export async function getCampaignPeriodMetrics(
       cpa: 0,
       cpc: 0,
       ctr: 0,
+      cpm: 0,
+      frequency: 0,
+      estimated_reach: 0,
     }
   }
 }

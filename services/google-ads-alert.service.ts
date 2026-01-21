@@ -17,7 +17,7 @@ export class GoogleAdsAlertService {
   ): Promise<GoogleAdsAlertSummary> {
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .rpc('get_google_ads_budget_alerts', { 
           p_user_id: userId || null, 
           p_user_role: userRole || null 
@@ -98,16 +98,19 @@ export class GoogleAdsAlertService {
       budget_limited: {
         title: 'Limitado por Orçamento',
         description: 'Campanha está perdendo impressões por falta de orçamento diário',
+        icon: 'AlertCircle',
         actionLabel: 'Aumentar Orçamento'
       },
       below_minimum: {
         title: 'Abaixo do Mínimo',
         description: 'Gasto diário está abaixo do orçamento mínimo recomendado',
+        icon: 'TrendingDown',
         actionLabel: 'Ajustar para Mínimo'
       },
       low_performance: {
         title: 'Performance Baixa',
         description: 'Share de impressões muito baixo devido a limitação de orçamento',
+        icon: 'Zap',
         actionLabel: 'Melhorar Performance'
       }
     };
