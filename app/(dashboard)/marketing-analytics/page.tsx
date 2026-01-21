@@ -7,6 +7,7 @@ import { KPISection } from '@/components/marketing-analytics/KPISection'
 import { TopCampaignsTable } from '@/components/marketing-analytics/TopCampaignsTable'
 import { CampaignsComparisonTable } from '@/components/campaigns/CampaignsComparisonTable'
 import { ObjectiveAnalysisChart } from '@/components/marketing-analytics/ObjectiveAnalysisChart'
+import { BiddingStrategyAnalysisChart } from '@/components/marketing-analytics/BiddingStrategyAnalysisChart'
 import { PlatformComparison } from '@/components/marketing-analytics/PlatformComparison'
 import { CampaignDetailsModal } from '@/components/campaigns/CampaignDetailsModal'
 import { BalanceAlertCard } from '@/components/alertas/BalanceAlertCard'
@@ -116,12 +117,21 @@ export default function MarketingAnalyticsPage() {
         <KPISection data={data} />
       </div>
 
-      {/* Análises */}
+      {/* Análises por Objetivo e Estratégia */}
       <div className="py-6">
         <div className="grid gap-6 md:grid-cols-2">
-          <ObjectiveAnalysisChart data={data.objectiveAnalysis} />
-          <PlatformComparison campaigns={data.campaigns} />
+          {data.objectiveAnalysis.length > 0 && (
+            <ObjectiveAnalysisChart data={data.objectiveAnalysis} />
+          )}
+          {data.biddingStrategyAnalysis.length > 0 && (
+            <BiddingStrategyAnalysisChart data={data.biddingStrategyAnalysis} />
+          )}
         </div>
+      </div>
+
+      {/* Comparação por Plataforma */}
+      <div className="py-6">
+        <PlatformComparison campaigns={data.campaigns} />
       </div>
 
       {/* Top Campanhas */}

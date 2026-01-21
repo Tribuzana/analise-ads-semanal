@@ -1,7 +1,7 @@
 import { MetricCard } from '@/components/dashboard/MetricCard'
-import { formatCurrency, formatNumber } from '@/lib/utils/format'
+import { formatCurrency, formatNumber, formatPercentage } from '@/lib/utils/format'
 import { TrendingUp, DollarSign, ShoppingCart, Target } from 'lucide-react'
-import type { MarketingAnalyticsData } from '@/types/marketing'
+import type { MarketingAnalyticsData, MetricConsistencyIssue } from '@/types/marketing'
 
 interface KPISectionProps {
   data: MarketingAnalyticsData
@@ -14,7 +14,9 @@ export function KPISection({ data }: KPISectionProps) {
   const averageROAS = totalSpend > 0 ? totalRevenue / totalSpend : 0
   const averageCPA = totalConversions > 0 ? totalSpend / totalConversions : 0
   const totalClicks = data.campaigns.reduce((sum, c) => sum + c.clicks, 0)
+  const totalImpressions = data.campaigns.reduce((sum, c) => sum + c.impressions, 0)
   const averageCPC = totalClicks > 0 ? totalSpend / totalClicks : 0
+  const averageCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0
 
   // Calcular métricas do período anterior se disponível
   const previousCampaigns = data.comparison?.campaigns || []
@@ -24,7 +26,9 @@ export function KPISection({ data }: KPISectionProps) {
   const previousAverageROAS = previousSpend > 0 ? previousRevenue / previousSpend : 0
   const previousAverageCPA = previousConversions > 0 ? previousSpend / previousConversions : 0
   const previousClicks = previousCampaigns.reduce((sum, c) => sum + c.clicks, 0)
+  const previousImpressions = previousCampaigns.reduce((sum, c) => sum + c.impressions, 0)
   const previousAverageCPC = previousClicks > 0 ? previousSpend / previousClicks : 0
+  const previousAverageCTR = previousImpressions > 0 ? (previousClicks / previousImpressions) * 100 : 0
 
   // Calcular deltas percentuais
   const calculateDelta = (current: number, previous: number): number => {
@@ -33,6 +37,16 @@ export function KPISection({ data }: KPISectionProps) {
   }
 
   const hasComparison = data.comparison && previousCampaigns.length > 0
+  const issuesByMetric = new Map<string, MetricConsistencyIssue>()
+  data.consistencyIssues?.forEach(issue => {
+    issuesByMetric.set(issue.metricName, issue)
+  })
+  const issueForCPC = issuesByMetric.get('CPC')
+  const issueForCTR = issuesByMetric.get('CTR')
+  const issueTooltip = (issue?: MetricConsistencyIssue) =>
+    issue
+      ? `${issue.metricName} inconsistente (${issue.dataPoints} pontos, delta ${issue.percentDifference.toFixed(1)}%). Relatado ${issue.reported.toFixed(2)}, recalculado ${issue.recalculated.toFixed(2)}.`
+      : undefined
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -82,6 +96,8 @@ export function KPISection({ data }: KPISectionProps) {
         icon={<DollarSign className="h-4 w-4" />}
         change={hasComparison ? calculateDelta(averageCPC, previousAverageCPC) : undefined}
         compareValue={hasComparison ? formatCurrency(previousAverageCPC) : undefined}
+        badgeLabel={issueForCPC ? 'Inconsistente' : undefined}
+        badgeTooltip={issueTooltip(issueForCPC)}
       />
 
       <MetricCard
@@ -90,6 +106,15 @@ export function KPISection({ data }: KPISectionProps) {
         icon={<ShoppingCart className="h-4 w-4" />}
         change={hasComparison ? calculateDelta(totalConversions, previousConversions) : undefined}
         compareValue={hasComparison ? formatNumber(previousConversions) : undefined}
+      />
+      <MetricCard
+        title="CTR Médio"
+        value={formatPercentage(averageCTR)}
+        icon={<TrendingUp className="h-4 w-4" />}
+        change={hasComparison ? calculateDelta(averageCTR, previousAverageCTR) : undefined}
+        compareValue={hasComparison ? formatPercentage(previousAverageCTR) : undefined}
+        badgeLabel={issueForCTR ? 'Inconsistente' : undefined}
+        badgeTooltip={issueTooltip(issueForCTR)}
       />
     </div>
   )

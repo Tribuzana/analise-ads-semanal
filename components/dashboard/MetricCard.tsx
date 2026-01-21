@@ -11,6 +11,8 @@ interface MetricCardProps {
   icon?: React.ReactNode
   compareValue?: string | number // Valor do período anterior (YoY)
   compareLabel?: string // Label para o valor de comparação (ex: "vs ano anterior")
+  badgeLabel?: string
+  badgeTooltip?: string
 }
 
 export function MetricCard({ 
@@ -20,7 +22,9 @@ export function MetricCard({
   subtitle, 
   icon,
   compareValue,
-  compareLabel = 'vs ano anterior'
+  compareLabel = 'vs ano anterior',
+  badgeLabel,
+  badgeTooltip
 }: MetricCardProps) {
   const getChangeColor = () => {
     if (change === undefined || change === 0) return 'bg-gray-100 text-gray-800'
@@ -51,6 +55,15 @@ export function MetricCard({
         )}
         {subtitle && !compareValue && (
           <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+        )}
+        {badgeLabel && (
+          <Badge
+            variant="destructive"
+            title={badgeTooltip}
+            className="mt-2"
+          >
+            {badgeLabel}
+          </Badge>
         )}
         {change !== undefined && (
           <Badge

@@ -28,11 +28,11 @@ export async function getDashboardMetrics(filters: FilterState): Promise<Dashboa
       selectedHotels: filters.selectedHotels.length,
     })
 
-    // 1. Buscar IDs de conta correspondentes usando o helper centralizado
-    const matchingAccountIds = await getMatchingClients(supabase, filters)
+    // 1. Buscar IDs de conta e códigos de cliente correspondentes usando o helper centralizado
+    const { accountIds, clientCodes } = await getMatchingClients(supabase, filters)
 
-    // Se filtrou mas não achou nenhuma conta, retorna vazio
-    if (matchingAccountIds !== null && matchingAccountIds.length === 0) {
+    // Se filtrou mas não achou nenhuma conta ou cliente, retorna vazio
+    if (accountIds !== null && accountIds.length === 0) {
       console.warn('[getDashboardMetrics] Nenhum ID de conta correspondente encontrado')
       return {
         geral: getEmptyMetrics(),
@@ -49,8 +49,12 @@ export async function getDashboardMetrics(filters: FilterState): Promise<Dashboa
       .lte('date', filters.endDate)
       .limit(10000)
 
-    if (matchingAccountIds !== null) {
-      query = query.in('account_id', matchingAccountIds)
+    if (clientCodes !== null) {
+      query = query.in('client', clientCodes)
+    }
+
+    if (accountIds !== null) {
+      query = query.in('account_id', accountIds)
     }
 
     const { data, error } = await query
@@ -188,7 +192,7 @@ async function fetchMetricsForPeriod(
   selectedCidades: string[],
   selectedEstados: string[]
 ): Promise<any[]> {
-  const matchingAccountIds = await getMatchingClients(supabase, {
+  const { accountIds, clientCodes } = await getMatchingClients(supabase, {
     startDate,
     endDate,
     selectedHotels,
@@ -196,7 +200,7 @@ async function fetchMetricsForPeriod(
     selectedEstados,
   })
 
-  if (matchingAccountIds !== null && matchingAccountIds.length === 0) {
+  if (accountIds !== null && accountIds.length === 0) {
     return []
   }
 
@@ -207,8 +211,12 @@ async function fetchMetricsForPeriod(
     .lte('date', endDate)
     .limit(10000)
 
-  if (matchingAccountIds !== null) {
-    query = query.in('account_id', matchingAccountIds)
+  if (clientCodes !== null) {
+    query = query.in('client', clientCodes)
+  }
+
+  if (accountIds !== null) {
+    query = query.in('account_id', accountIds)
   }
 
   const { data, error } = await query
@@ -253,7 +261,7 @@ export async function getLast4WeeksData(filters: Pick<FilterState, 'selectedHote
   const supabase = createClient()
   const { startDate, endDate } = getLast4Weeks()
 
-  const matchingAccountIds = await getMatchingClients(supabase, {
+  const { accountIds, clientCodes } = await getMatchingClients(supabase, {
     startDate,
     endDate,
     selectedHotels: filters.selectedHotels,
@@ -261,7 +269,7 @@ export async function getLast4WeeksData(filters: Pick<FilterState, 'selectedHote
     selectedEstados: filters.selectedEstados,
   })
 
-  if (matchingAccountIds !== null && matchingAccountIds.length === 0) {
+  if (accountIds !== null && accountIds.length === 0) {
     return []
   }
 
@@ -272,8 +280,12 @@ export async function getLast4WeeksData(filters: Pick<FilterState, 'selectedHote
     .lte('date', endDate)
     .limit(10000)
 
-  if (matchingAccountIds !== null) {
-    query = query.in('account_id', matchingAccountIds)
+  if (clientCodes !== null) {
+    query = query.in('client', clientCodes)
+  }
+
+  if (accountIds !== null) {
+    query = query.in('account_id', accountIds)
   }
 
   const { data, error } = await query

@@ -19,11 +19,11 @@ export async function generateAlerts(filters: FilterState): Promise<Alert[]> {
       return []
     }
 
-    // 1. Buscar IDs de conta correspondentes usando o helper centralizado
-    const matchingAccountIds = await getMatchingClients(supabase, filters)
+    // 1. Buscar IDs de conta e códigos de cliente correspondentes usando o helper centralizado
+    const { accountIds, clientCodes } = await getMatchingClients(supabase, filters)
 
-    // Se filtrou mas não achou nenhuma conta, retorna vazio
-    if (matchingAccountIds !== null && matchingAccountIds.length === 0) {
+    // Se filtrou mas não achou nenhuma conta ou cliente, retorna vazio
+    if (accountIds !== null && accountIds.length === 0) {
       console.warn('[generateAlerts] Nenhum ID de conta correspondente encontrado')
       return []
     }
@@ -36,8 +36,12 @@ export async function generateAlerts(filters: FilterState): Promise<Alert[]> {
       .lte('date', filters.endDate)
       .limit(10000)
 
-    if (matchingAccountIds !== null) {
-      currentQuery = currentQuery.in('account_id', matchingAccountIds)
+    if (clientCodes !== null) {
+      currentQuery = currentQuery.in('client', clientCodes)
+    }
+
+    if (accountIds !== null) {
+      currentQuery = currentQuery.in('account_id', accountIds)
     }
 
     const { data: currentData, error: currentError } = await currentQuery
@@ -52,7 +56,7 @@ export async function generateAlerts(filters: FilterState): Promise<Alert[]> {
       ? getYearAgoRange(filters.startDate, filters.endDate)
       : getPreviousPeriodRange(filters.startDate, filters.endDate)
     
-    const prevMatchingAccountIds = await getMatchingClients(supabase, {
+    const { accountIds: prevAccountIds, clientCodes: prevClientCodes } = await getMatchingClients(supabase, {
       startDate: previousRange.startDate,
       endDate: previousRange.endDate,
       selectedHotels: filters.selectedHotels,
@@ -67,9 +71,12 @@ export async function generateAlerts(filters: FilterState): Promise<Alert[]> {
       .lte('date', previousRange.endDate)
       .limit(10000)
 
-    if (prevMatchingAccountIds !== null) {
-      if (prevMatchingAccountIds.length > 0) {
-        previousQuery = previousQuery.in('account_id', prevMatchingAccountIds)
+    if (prevAccountIds !== null) {
+      if (prevAccountIds.length > 0) {
+        if (prevClientCodes !== null) {
+          previousQuery = previousQuery.in('client', prevClientCodes)
+        }
+        previousQuery = previousQuery.in('account_id', prevAccountIds)
       } else {
         // Se filtrou mas não achou nada no período anterior, previousData será vazio
         previousQuery = null as any

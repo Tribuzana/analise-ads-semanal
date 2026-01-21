@@ -3,14 +3,31 @@ import { FilterState } from '@/types'
 import { mapHotelToClient } from '@/lib/utils/hotel-mapping'
 
 /**
- * Busca os IDs de conta (campo 'account_id' na tabela metricas_ads) correspondentes aos filtros de hotel, cidade e estado.
- * Centraliza a lógica para evitar problemas com colunas inconsistentes (como 'client' no Meta).
+ * Resultado da busca de clientes correspondentes
+ */
+export interface MatchingClientsResult {
+  accountIds: string[] | null;
+  clientCodes: string[] | null;
+}
+
+/**
+ * Busca os IDs de conta (campo 'account_id' na tabela metricas_ads) e códigos de cliente
+ * correspondentes aos filtros de hotel, cidade e estado.
+ * Centraliza a lógica para evitar problemas com colunas inconsistentes.
  */
 export async function getMatchingClients(
   supabase: SupabaseClient,
   filters: Pick<FilterState, 'selectedHotels' | 'selectedCidades' | 'selectedEstados' | 'startDate' | 'endDate'>
-): Promise<string[] | null> {
+): Promise<MatchingClientsResult> {
   const { selectedHotels, selectedCidades, selectedEstados, startDate, endDate } = filters
+
+  console.log('[filter-helpers] Filtros recebidos:', {
+    selectedHotels: selectedHotels.length,
+    selectedCidades: selectedCidades.length,
+    selectedEstados: selectedEstados.length,
+    startDate,
+    endDate
+  })
 
   // 1. Se houver filtros de cidade ou estado, primeiro buscamos os nomes dos hotéis correspondentes
   let hotelNamesFromGeo: string[] = []
@@ -30,13 +47,13 @@ export async function getMatchingClients(
     const { data: hoteisFiltrados, error: geoError } = await hotelQuery
     if (geoError) {
       console.error('[filter-helpers] Erro ao buscar hotéis por cidade/estado:', geoError)
-      return []
+      return { accountIds: [], clientCodes: [] }
     }
     
     hotelNamesFromGeo = hoteisFiltrados?.map((h: any) => h.nome_hotel) || []
     
     if (hotelNamesFromGeo.length === 0) {
-      return []
+      return { accountIds: [], clientCodes: [] }
     }
   }
 
@@ -45,11 +62,10 @@ export async function getMatchingClients(
 
   // Se não houver nenhum filtro de hotel/geo, retornamos null para indicar que não deve aplicar filtro
   if (finalHotelNames.length === 0 && selectedCidades.length === 0 && selectedEstados.length === 0) {
-    return null
+    return { accountIds: null, clientCodes: null }
   }
 
   // 3. Buscar todas as contas únicas disponíveis no período para fazer o mapeamento correto
-  // Buscamos account_id, account_name e client para ter redundância no match
   const { data: uniqueAccounts, error: accountsError } = await supabase
     .from('metricas_ads')
     .select('account_id, account_name, client, platform')
@@ -59,24 +75,24 @@ export async function getMatchingClients(
   
   if (accountsError) {
     console.error('[filter-helpers] Erro ao buscar contas únicas:', accountsError)
-    return []
+    return { accountIds: [], clientCodes: [] }
   }
   
-  // Usar um Map para garantir unicidade por account_id e facilitar o processamento
   const accountsMap = new Map<string, { account_name: string, client: string, platform: string }>()
   uniqueAccounts?.forEach((acc: any) => {
     if (acc.account_id) {
-      accountsMap.set(acc.account_id, {
-        account_name: acc.account_name || '',
-        client: acc.client || '',
-        platform: acc.platform || ''
-      })
+      const accountData = {
+        account_name: (acc.account_name || '').toString().trim(),
+        client: (acc.client || '').toString().trim(),
+        platform: (acc.platform || '').toString().trim()
+      }
+      accountsMap.set(acc.account_id, accountData)
     }
   })
-  
+
   const matchingAccountIds = new Set<string>()
-  
-  // Função auxiliar para normalização robusta
+  const matchingClientCodes = new Set<string>()
+
   const normalize = (text: string) => 
     text.toLowerCase()
         .normalize('NFD')
@@ -87,41 +103,43 @@ export async function getMatchingClients(
   finalHotelNames.forEach(hotelName => {
     const mapped = mapHotelToClient(hotelName)
     const normalizedMapped = normalize(mapped)
-    
+
     if (!normalizedMapped) return
+    
+    // Sempre adicionar o código mapeado diretamente
+    matchingClientCodes.add(mapped)
 
     accountsMap.forEach((data, accountId) => {
       const normalizedClient = normalize(data.client)
       const normalizedAccountName = normalize(data.account_name)
-      const platform = (data.platform || '').toLowerCase()
-      const isMeta = platform.includes('meta')
-      
-      // Para Meta Ads, o client no banco de dados está inconsistente (ex: DPNY com client 'grinbergs')
-      // Portanto, priorizamos o account_name para Meta Ads.
-      if (isMeta) {
-        if (
-          normalizedAccountName === normalizedMapped ||
-          normalizedAccountName.includes(normalizedMapped) ||
-          normalizedMapped.includes(normalizedAccountName)
-        ) {
-          matchingAccountIds.add(accountId)
-        }
-      } else {
-        // Para Google Ads e outras plataformas, o client é mais confiável
-        if (
+
+      let accountMatches = false
+
+      if (normalizedClient && (
           normalizedClient === normalizedMapped ||
           normalizedClient.includes(normalizedMapped) ||
-          normalizedMapped.includes(normalizedClient) ||
+          normalizedMapped.includes(normalizedClient))) {
+        accountMatches = true
+      }
+
+      if (!accountMatches && normalizedAccountName && (
           normalizedAccountName === normalizedMapped ||
-          normalizedAccountName.includes(normalizedMapped)
-        ) {
-          matchingAccountIds.add(accountId)
-        }
+          normalizedAccountName.includes(normalizedMapped) ||
+          normalizedMapped.includes(normalizedAccountName))) {
+        accountMatches = true
+      }
+
+      if (accountMatches) {
+        matchingAccountIds.add(accountId)
+        if (data.client) matchingClientCodes.add(data.client)
       }
     })
   })
-  
-  return Array.from(matchingAccountIds)
+
+  return {
+    accountIds: Array.from(matchingAccountIds),
+    clientCodes: Array.from(matchingClientCodes)
+  }
 }
 
 /**

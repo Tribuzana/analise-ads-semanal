@@ -9,7 +9,18 @@ export interface MarketingMetrics {
   ctr: number
   impressions: number
   clicks: number
+  cpm: number
+  frequency: number
+  estimated_reach: number
 }
+
+export interface MetricConsistencyIssue {
+  metricName: string
+  reported: number
+  recalculated: number
+  percentDifference: number
+  dataPoints: number
+ }
 
 export interface MarketingAnalytics {
   totalSpend: number
@@ -31,6 +42,8 @@ export interface CampaignData {
   client: string
   platform: 'Google Ads' | 'Meta Ads' | 'Google' | 'Meta'
   campaign_objective: string | null
+  campaign_bidding_strategy_type: string | null
+  advertising_channel_type: string | null
   campaign_status: string | null
   spend: number
   revenue: number
@@ -41,10 +54,22 @@ export interface CampaignData {
   cpa: number
   cpc: number
   ctr: number
+  cpm: number
+  frequency: number
+  estimated_reach: number
 }
 
 export interface ObjectiveAnalysis {
   objective: string
+  campaigns: number
+  spend: number
+  revenue: number
+  roas: number
+  conversions: number
+}
+
+export interface BiddingStrategyAnalysis {
+  biddingStrategy: string
   campaigns: number
   spend: number
   revenue: number
@@ -63,6 +88,7 @@ export interface TemporalData {
 export interface MarketingAnalyticsComparison {
   campaigns: CampaignData[]
   objectiveAnalysis: ObjectiveAnalysis[]
+  biddingStrategyAnalysis: BiddingStrategyAnalysis[]
   temporalData: TemporalData[]
   topCampaigns: CampaignData[]
 }
@@ -70,12 +96,14 @@ export interface MarketingAnalyticsComparison {
 export interface MarketingAnalyticsData {
   campaigns: CampaignData[]
   objectiveAnalysis: ObjectiveAnalysis[]
+  biddingStrategyAnalysis: BiddingStrategyAnalysis[]
   temporalData: TemporalData[]
   topCampaigns: CampaignData[]
+  consistencyIssues?: MetricConsistencyIssue[]
   comparison?: MarketingAnalyticsComparison
 }
 
-export type SortField = 'campaign_name' | 'campaign_objective' | 'spend' | 'revenue' | 'roas' | 'conversions' | 'cpa' | 'clicks' | 'ctr' | 'cpc' | 'client' | 'platform'
+export type SortField = 'campaign_name' | 'campaign_objective' | 'campaign_bidding_strategy_type' | 'advertising_channel_type' | 'spend' | 'revenue' | 'roas' | 'conversions' | 'cpa' | 'clicks' | 'ctr' | 'cpc' | 'client' | 'platform'
 export type SortDirection = 'asc' | 'desc'
 export type CampaignStatusFilter = 'all' | 'active' | 'paused'
 
@@ -89,6 +117,9 @@ export interface CampaignPeriodMetrics {
   cpa: number
   cpc: number
   ctr: number
+  cpm: number
+  frequency: number
+  estimated_reach: number
 }
 
 export interface CampaignVariation {

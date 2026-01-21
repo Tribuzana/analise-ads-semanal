@@ -72,6 +72,10 @@ export function CampaignDetailsModal({
                 <p className="font-medium">{campaign.campaign_objective || 'N/A'}</p>
               </div>
               <div>
+                <p className="text-sm text-muted-foreground mb-1">Estratégia</p>
+                <p className="font-medium">{campaign.campaign_bidding_strategy_type || 'N/A'}</p>
+              </div>
+              <div>
                 <p className="text-sm text-muted-foreground mb-1">Status</p>
                 <Badge variant="secondary" className={getStatusColor(campaign.campaign_status)}>
                   {campaign.campaign_status || 'N/A'}

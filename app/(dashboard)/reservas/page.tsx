@@ -1,16 +1,20 @@
 'use client'
 
 import { useReservas } from '@/hooks/useReservas'
+import { useFilterContext } from '@/contexts/FilterContext'
+import { MetricCard } from '@/components/dashboard/MetricCard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { LineChart } from '@/components/charts/LineChart'
 import { PieChart } from '@/components/charts/PieChart'
 import { BarChart } from '@/components/charts/BarChart'
 import { formatNumber } from '@/lib/utils/format'
-import { Calendar, Smartphone, Monitor, Tablet, TrendingUp } from 'lucide-react'
+import { calculateDelta } from '@/lib/utils/calculations'
+import { Calendar, Clock, TrendingUp } from 'lucide-react'
 
 export default function ReservasPage() {
   const { data, loading, error } = useReservas()
+  const { compareYearAgo } = useFilterContext()
 
   if (loading) {
     return (
@@ -34,6 +38,11 @@ export default function ReservasPage() {
 
   if (!data) return null
 
+  const compareLabel = compareYearAgo ? 'vs ano anterior' : 'vs período anterior'
+  const totalBuscasDelta = calculateDelta(data.totalBuscas, data.totalBuscasAnterior)
+  const antecedenciaDelta = calculateDelta(data.antecedenciaMedia, data.antecedenciaMediaAnterior)
+  const duracaoDelta = calculateDelta(data.duracaoMedia, data.duracaoMediaAnterior)
+
   return (
     <div className="space-y-10 pb-8">
       <div>
@@ -45,50 +54,31 @@ export default function ReservasPage() {
 
       {/* Métricas principais */}
       <div className="py-6">
-        <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Buscas</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(data.totalBuscas)}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Antecedência Média</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(data.antecedenciaMedia, 1)} dias</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Duração Média</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(data.duracaoMedia, 1)} dias</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Buscas por Dia</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {data.totalBuscas > 0 && data.porDia.length > 0
-                ? formatNumber(data.totalBuscas / data.porDia.length, 0)
-                : 0}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricCard
+            title="Buscas últimos 7 dias"
+            value={formatNumber(data.totalBuscas)}
+            icon={<Calendar className="h-4 w-4" />}
+            change={totalBuscasDelta}
+            compareValue={formatNumber(data.totalBuscasAnterior)}
+            compareLabel={compareLabel}
+          />
+          <MetricCard
+            title="Antecedência média"
+            value={`${formatNumber(data.antecedenciaMedia, 1)} dias`}
+            icon={<TrendingUp className="h-4 w-4" />}
+            change={antecedenciaDelta}
+            compareValue={`${formatNumber(data.antecedenciaMediaAnterior, 1)} dias`}
+            compareLabel={compareLabel}
+          />
+          <MetricCard
+            title="Duração média"
+            value={`${formatNumber(data.duracaoMedia, 1)} dias`}
+            icon={<Clock className="h-4 w-4" />}
+            change={duracaoDelta}
+            compareValue={`${formatNumber(data.duracaoMediaAnterior, 1)} dias`}
+            compareLabel={compareLabel}
+          />
         </div>
       </div>
 
@@ -116,6 +106,57 @@ export default function ReservasPage() {
         </Card>
         </div>
       )}
+
+      <div className="py-6">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Distribuição de Antecedência</CardTitle>
+              <CardDescription>Percentual de buscas por faixas de antecedência</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {data.distribuicaoAntecedencia.length > 0 ? (
+                <BarChart
+                  data={data.distribuicaoAntecedencia.map(item => ({
+                    faixa: item.faixa,
+                    count: item.count,
+                  }))}
+                  dataKeys={[
+                    { key: 'count', name: 'Buscas', color: 'hsl(var(--primary))' },
+                  ]}
+                  xAxisKey="faixa"
+                  yAxisFormatter={(value: any) => formatNumber(value)}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Sem dados de antecedência para o período selecionado.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Distribuição de Duração</CardTitle>
+              <CardDescription>Proporção de buscas por duração média</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {data.distribuicaoDuracao.length > 0 ? (
+                <PieChart
+                  data={data.distribuicaoDuracao.map(item => ({
+                    name: item.faixa,
+                    value: item.count,
+                  }))}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Sem dados de duração no intervalo atual.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <div className="py-6">
         <div className="grid gap-4 md:grid-cols-2">

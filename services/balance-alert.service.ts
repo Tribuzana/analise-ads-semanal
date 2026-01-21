@@ -11,7 +11,7 @@ export class BalanceAlertService {
   ): Promise<BalanceAlertSummary> {
     try {
       const supabase = createClient();
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .rpc('get_balance_alerts', { 
           p_user_id: userId || null, 
           p_user_role: userRole || null 

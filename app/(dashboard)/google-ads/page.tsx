@@ -9,6 +9,7 @@ import { CampaignsComparisonTable } from '@/components/campaigns/CampaignsCompar
 import { CampaignDetailsModal } from '@/components/campaigns/CampaignDetailsModal'
 import { CampaignStatusFilterComponent } from '@/components/campaigns/CampaignStatusFilter'
 import { ObjectiveAnalysisChart } from '@/components/marketing-analytics/ObjectiveAnalysisChart'
+import { BiddingStrategyAnalysisChart } from '@/components/marketing-analytics/BiddingStrategyAnalysisChart'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Globe } from 'lucide-react'
 import { getCampaignPeriodMetrics } from '@/lib/actions/marketing-analytics/get-analytics'
@@ -138,13 +139,17 @@ export default function GoogleAdsPage() {
         />
       </div>
 
-      {/* Análise por Objetivo */}
-      {data.objectiveAnalysis.length > 0 && (
-        <div className="py-6">
-          <h2 className="text-xl font-semibold mb-6">Análise por Objetivo</h2>
-          <ObjectiveAnalysisChart data={data.objectiveAnalysis} />
+      {/* Análises por Objetivo e Estratégia */}
+      <div className="py-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          {data.objectiveAnalysis.length > 0 && (
+            <ObjectiveAnalysisChart data={data.objectiveAnalysis} />
+          )}
+          {data.biddingStrategyAnalysis.length > 0 && (
+            <BiddingStrategyAnalysisChart data={data.biddingStrategyAnalysis} />
+          )}
         </div>
-      )}
+      </div>
 
       {/* Tabela de Campanhas com Variação */}
       <div className="py-6">
